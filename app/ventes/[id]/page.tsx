@@ -1,124 +1,111 @@
 "use client";
 import { use, useEffect, useMemo, useState } from "react";
 
-export default function Page({ params }:{ params: Promise<{ id:string }> }) {
-  const { id } = use(params);
-  const [vente, setVente] = useState<any>(null);
-  const [err, setErr] = useState<string|null>(null);
-  const [loading, setLoading] = useState(true);
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params); // lot id
+  const [lot, setLot] = useState<any>(null);
 
-  // form TMA
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const [delta, setDelta] = useState<string>("0");
-  const [busy, setBusy] = useState(false);
+  const [formVente, setFormVente] = useState({ client: "", prixVenteHt: "", tvaRate: "20" });
+  const [formTma, setFormTma] = useState({ venteId: "", code: "", description: "", deltaHt: "" });
 
-  async function load() {
-    setLoading(true); setErr(null);
-    try {
-      const res = await fetch(`/api/ventes/${id}`, { cache: "no-store" });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
-      setVente(d);
-    } catch (e:any) {
-      setErr(e.message || "Erreur inconnue");
-    } finally {
-      setLoading(false);
-    }
+  async function reload() {
+    const res = await fetch(`/api/ventes/${id}`, { cache: "no-store" });
+    const d = await res.json(); setLot(d);
   }
-  useEffect(()=>{ load(); }, [id]);
+  useEffect(() => { reload(); }, [id]);
 
-  async function addTma() {
-    setBusy(true); setErr(null);
-    try {
-      const res = await fetch(`/api/ventes/${id}/tma`, {
-        method: "POST",
-        headers: { "content-type":"application/json" },
-        body: JSON.stringify({ code: code || undefined, description, deltaHt: parseFloat(delta || "0") }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
-      setCode(""); setDescription(""); setDelta("0");
-      await load();
-    } catch (e:any) {
-      setErr(e.message || "Erreur inconnue");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const f = (n:number)=> (n||0).toLocaleString("fr-FR")+" €";
 
-  const totals = useMemo(()=>{
-    if (!vente) return null;
-    const htBase = vente.prixVenteHt || 0;
-    const tma = vente.tmaTotalHt || 0;
-    const ht = htBase + tma;
-    const tva = ht * ((vente.tvaRate || 0)/100);
-    const ttc = ht + tva;
-    return { htBase, tma, ht, tva, ttc };
-  }, [vente]);
+  const synthese = useMemo(() => {
+    if (!lot?.ventes) return [];
+    return lot.ventes.map((v:any) => {
+      const tmaHt = (v.tmas||[]).reduce((s:number, t:any)=> s + (t.deltaHt || 0), 0);
+      const ht = (v.prixVenteHt || 0) + tmaHt;
+      const ttc = ht * (1 + (v.tvaRate||0)/100);
+      return { id: v.id, client: v.client, prixHt: v.prixVenteHt||0, tmaHt, ht, ttc, tvaRate: v.tvaRate||0 };
+    });
+  }, [lot]);
 
-  const fmt = (n:number)=> n.toLocaleString("fr-FR")+" €";
-
-  if (loading) return <div className="p-6">Chargement…</div>;
-  if (err) return <div className="p-6 text-red-600">{err}</div>;
-  if (!vente || !totals) return <div className="p-6">Vente introuvable</div>;
+  if (!lot) return <div className="p-6">Chargement…</div>;
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="text-xl font-bold">Vente — Lot {vente.lot?.numero}</div>
-        <a className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50" href={`/ventes/${id}/print`} target="_blank">
-          Imprimer
-        </a>
+      <div className="text-2xl font-bold">Ventes — Lot {lot.numero}</div>
+
+      {/* Ajout vente */}
+      <div className="rounded border p-4 bg-white space-y-2">
+        <div className="font-medium">Ajouter une vente</div>
+        <div className="grid md:grid-cols-3 gap-2">
+          <input className="rounded border px-2 py-1" placeholder="Client"
+                 value={formVente.client} onChange={e=>setFormVente({...formVente,client:e.target.value})}/>
+          <input className="rounded border px-2 py-1" type="number" placeholder="Prix HT"
+                 value={formVente.prixVenteHt} onChange={e=>setFormVente({...formVente,prixVenteHt:e.target.value})}/>
+          <input className="rounded border px-2 py-1" type="number" placeholder="TVA %"
+                 value={formVente.tvaRate} onChange={e=>setFormVente({...formVente,tvaRate:e.target.value})}/>
+        </div>
+        <button className="rounded bg-blue-600 text-white px-3 py-1.5"
+                onClick={async ()=>{
+                  await fetch(`/api/ventes/${id}`,{
+                    method:"POST", headers:{"content-type":"application/json"},
+                    body: JSON.stringify({ ...formVente }),
+                  });
+                  setFormVente({ client:"", prixVenteHt:"", tvaRate:"20" });
+                  reload();
+                }}>Ajouter</button>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-3">
-        <div className="rounded border p-3">
-          <div><b>Client</b> : {vente.client}</div>
-          <div><b>TVA</b> : {(vente.tvaRate||0).toLocaleString("fr-FR")}%</div>
-          <div><b>Prix catalogue (lot)</b> : {fmt(vente.lot?.prixCatalogueHt || 0)}</div>
-          <div><b>Prix vente HT</b> : {fmt(vente.prixVenteHt || 0)}</div>
-        </div>
-        <div className="rounded border p-3">
-          <div className="font-semibold mb-1">Synthèse</div>
-          <div className="flex justify-between"><span>Base HT</span><span>{fmt(totals.htBase)}</span></div>
-          <div className="flex justify-between"><span>TMA (±)</span><span>{fmt(totals.tma)}</span></div>
-          <div className="flex justify-between"><span>Total HT</span><span className="font-semibold">{fmt(totals.ht)}</span></div>
-          <div className="flex justify-between"><span>TVA</span><span>{fmt(totals.tva)}</span></div>
-          <div className="flex justify-between"><span>Total TTC</span><span className="font-bold">{fmt(totals.ttc)}</span></div>
-        </div>
-        <div className="rounded border p-3">
-          <div className="font-semibold mb-1">Ajouter une TMA</div>
-          <input className="rounded border px-2 py-1 mb-2 w-full" placeholder="Code (optionnel)" value={code} onChange={e=>setCode(e.target.value)} />
-          <input className="rounded border px-2 py-1 mb-2 w-full" placeholder="Description" value={description} onChange={e=>setDescription(e.target.value)} />
-          <input className="rounded border px-2 py-1 mb-2 w-full" placeholder="Delta HT (ex: 1200 ou -300)" type="number" step="0.01" value={delta} onChange={e=>setDelta(e.target.value)} />
-          <button onClick={addTma} disabled={busy || !description} className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
-            {busy ? "Ajout…" : "Ajouter"}
-          </button>
-          {err && <div className="text-red-600 text-sm mt-2">{err}</div>}
-        </div>
-      </div>
-
-      <div className="rounded border overflow-hidden">
-        <table className="w-full text-sm border-collapse">
+      {/* Liste ventes + TMA */}
+      <div className="rounded border overflow-hidden bg-white">
+        <table className="w-full text-sm">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-2 py-2 text-left w-24">Code</th>
-              <th className="px-2 py-2 text-left">Description</th>
-              <th className="px-2 py-2 text-right w-28">Delta HT</th>
+              <th className="px-2 py-2 text-left">Client</th>
+              <th className="px-2 py-2 text-right">Prix HT</th>
+              <th className="px-2 py-2 text-right">TMA (±)</th>
+              <th className="px-2 py-2 text-right">Total HT</th>
+              <th className="px-2 py-2 text-right">TVA %</th>
+              <th className="px-2 py-2 text-right">Total TTC</th>
+              <th className="px-2 py-2 text-right">TMA +</th>
             </tr>
           </thead>
           <tbody>
-            {(vente.tmas||[]).map((t:any)=>(
-              <tr key={t.id} className="border-t">
-                <td className="px-2 py-1">{t.code || "-"}</td>
-                <td className="px-2 py-1">{t.description}</td>
-                <td className="px-2 py-1 text-right">{(t.deltaHt||0).toLocaleString("fr-FR")} €</td>
+            {(synthese||[]).map((v:any)=>(
+              <tr key={v.id} className="border-t">
+                <td className="px-2 py-1">{v.client}</td>
+                <td className="px-2 py-1 text-right">{f(v.prixHt)}</td>
+                <td className="px-2 py-1 text-right">{f(v.tmaHt)}</td>
+                <td className="px-2 py-1 text-right">{f(v.ht)}</td>
+                <td className="px-2 py-1 text-right">{v.tvaRate}</td>
+                <td className="px-2 py-1 text-right">{f(v.ttc)}</td>
+                <td className="px-2 py-1 text-right">
+                  <TmaForm venteId={v.id} onOk={reload}/>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+    </div>
+  );
+}
+
+function TmaForm({ venteId, onOk }:{ venteId:number; onOk:()=>void }) {
+  const [code,setCode] = useState(""); const [desc,setDesc]=useState("");
+  const [delta,setDelta] = useState("");
+  return (
+    <div className="flex gap-1 justify-end">
+      <input className="rounded border px-2 py-1 w-20" placeholder="Code" value={code} onChange={e=>setCode(e.target.value)}/>
+      <input className="rounded border px-2 py-1 w-40" placeholder="Description" value={desc} onChange={e=>setDesc(e.target.value)}/>
+      <input className="rounded border px-2 py-1 w-24" type="number" placeholder="Δ HT" value={delta} onChange={e=>setDelta(e.target.value)}/>
+      <button className="rounded border px-2 py-1 text-xs hover:bg-slate-50"
+              onClick={async ()=>{
+                await fetch(`/api/ventes/tma/${venteId}`,{
+                  method:"POST", headers:{"content-type":"application/json"},
+                  body: JSON.stringify({ code, description: desc, deltaHt: Number(delta||0) })
+                });
+                setCode(""); setDesc(""); setDelta(""); onOk();
+              }}>+ TMA</button>
     </div>
   );
 }

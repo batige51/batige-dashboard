@@ -1,7 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export default function Page() {
+export default function Home() {
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Bienvenue</h1>
+      <p className="text-slate-600">Raccourcis utiles pendant le développement :</p>
+      <ul className="list-disc pl-6 space-y-1">
+        <li><a className="text-blue-600 hover:underline" href="/projects/1" target="_blank">Projet #1</a></li>
+        <li><a className="text-blue-600 hover:underline" href="/budget/1" target="_blank">Budget projet</a></li>
+        <li><a className="text-blue-600 hover:underline" href="/marches/1/dpgf-edit" target="_blank">Édition DPGF (marché #1)</a></li>
+        <li><a className="text-blue-600 hover:underline" href="/factures/nouvelle/1" target="_blank">Nouvelle facture (marché #1)</a></li>
+        <li><a className="text-blue-600 hover:underline" href="/marches/1/budget" target="_blank">Budget marché #1</a></li>
+        <li><a className="text-blue-600 hover:underline" href="/marches/1/avenants" target="_blank">Avenants marché #1</a></li>
+      </ul>
+      <div className="text-xs text-slate-500">Remplace les “#1” par tes IDs si besoin.</div>
+    </div>
+  );
+}export default function Page() {
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<string|null>(null);
   const [loading, setLoading] = useState(true);

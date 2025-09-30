@@ -2,23 +2,35 @@ import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-// Lit une vente avec son lot et ses TMA
+/** GET /api/ventes/[id] (id = lot) */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const vid = parseInt(id, 10);
-  if (isNaN(vid)) return NextResponse.json({ error: "ID vente invalide" }, { status: 400 });
+  const lotId = parseInt(id, 10);
+  if (isNaN(lotId)) return NextResponse.json({ error: "ID lot invalide" }, { status: 400 });
 
-  const vente = await prisma.venteActee.findUnique({
-    where: { id: vid },
-    include: {
-      lot: true,
-      tmas: { orderBy: { id: "asc" } },
+  const lot = await prisma.lot.findUnique({
+    where: { id: lotId },
+    include: { ventes: { include: { tmas: true } } },
+  });
+  if (!lot) return NextResponse.json({ error: "Lot introuvable" }, { status: 404 });
+
+  return NextResponse.json(lot);
+}
+
+/** POST /api/ventes/[id]  body: { client, prixVenteHt, tvaRate } */
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const lotId = parseInt(id, 10);
+  if (isNaN(lotId)) return NextResponse.json({ error: "ID lot invalide" }, { status: 400 });
+
+  const b = await req.json();
+  const v = await prisma.venteActee.create({
+    data: {
+      lotId,
+      client: String(b.client || "Client"),
+      prixVenteHt: parseFloat(b.prixVenteHt || 0) || 0,
+      tvaRate: parseFloat(b.tvaRate || 20) || 0,
     },
   });
-  if (!vente) return NextResponse.json({ error: "Vente introuvable" }, { status: 404 });
-
-  // Total TMA recalculé pour cohérence
-  const tmaTotal = (vente.tmas || []).reduce((s, l)=> s + (l.deltaHt || 0), 0);
-
-  return NextResponse.json({ ...vente, tmaTotalHt: tmaTotal });
+  return NextResponse.json(v, { status: 201 });
 }

@@ -1,206 +1,207 @@
 "use client";
-import { use, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { use, useEffect, useMemo, useState, use } from "react";
 
-type Dpgf = { id: number; code: string | null; description: string; totalHt: number; validatedHt: number };
+type MarcheInfo = {
+  id: number;
+  reference?: string | null;
+  project?: { id: number; name: string };
+  entreprise?: { id: number; name: string };
+};
+type DpgfLine = {
+  id: number;
+  code?: string | null;
+  description?: string | null;
+  totalHt: number;
+  validatedHt: number;
+};
 
-function detectSep(s: string) { return s.includes(";") ? ";" : ","; }
-function numFR(v: string) {
-  if (!v) return 0;
-  const n = Number(v.replace(/\u00a0/g," ").replace(/\s/g,"").replace(",","."));
-  return isNaN(n) ? 0 : n;
-}
-
-export default function Page({ params }: { params: Promise<{ marcheId: string }> }) {
-  const { marcheId } = use(params);
-  const [marche, setMarche] = useState<any>(null);
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params); // id = marché
+  const [marche, setMarche] = useState<MarcheInfo | null>(null);
+  const [lignes, setLignes] = useState<DpgfLine[]>([]);
   const [numero, setNumero] = useState("");
-  const [rows, setRows] = useState<any[]>([]);
-  const [unknown, setUnknown] = useState<any[]>([]);
+  const [req, setReq] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string|null>(null);
-  const [err, setErr] = useState<string|null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/marches/${marcheId}`, { cache: "no-store" });
-      const data = await res.json();
-      setMarche(data);
+      setErr(null);
+      try {
+        // 1) Infos marché basiques
+        const mres = await fetch(`/api/marches/${id}`, { cache: "no-store" });
+        const md = await mres.json();
+        if (!mres.ok) throw new Error(md?.error || `Marche ${id} introuvable`);
+        setMarche({ id: md.id, reference: md.reference, project: md.project, entreprise: md.entreprise });
+
+        // 2) DPGF du marché
+        const dres = await fetch(`/api/marches/${id}/dpgf`, { cache: "no-store" });
+        const dd = await dres.json();
+        if (!dres.ok) throw new Error(dd?.error || `DPGF indisponible`);
+        const map = dd.map((x: any) => ({
+          id: x.id,
+          code: x.code,
+          description: x.description,
+          totalHt: x.totalHt || 0,
+          validatedHt: x.validatedHt || 0,
+        }));
+        setLignes(map);
+
+        // init inputs à 0
+        const init: Record<number, string> = {};
+        map.forEach((l: DpgfLine) => (init[l.id] = "0"));
+        setReq(init);
+      } catch (e: any) {
+        setErr(e.message || "Erreur chargement");
+      }
     })();
-  }, [marcheId]);
+  }, [id]);
 
-  const dpgfByCode = useMemo(() => {
-    const m = new Map<string, Dpgf>();
-    (marche?.dpgf || []).forEach((l: Dpgf) => {
-      const key = (l.code || "").trim().toLowerCase();
-      if (key) m.set(key, l);
-    });
-    return m;
-  }, [marche]);
+  const totalDemande = useMemo(() => {
+    return Object.values(req).reduce((s, v) => {
+      const n = parseFloat(v || "0");
+      return s + (isFinite(n) ? n : 0);
+    }, 0);
+  }, [req]);
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    setErr(null); setMsg(null); setRows([]); setUnknown([]);
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const text = await f.text();
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length>0);
-    if (!lines.length) { setErr("CSV vide"); return; }
-
-    const sep = detectSep(lines[0]);
-    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase());
-
-    const hasA = headers.includes("code") && headers.includes("montant_ht");
-    const hasB = headers.includes("code") && headers.includes("quantite") && headers.includes("pu_ht");
-    if (!hasA && !hasB) {
-      setErr("En-têtes attendus: soit (code;montant_ht) soit (code;quantite;pu_ht)");
-      return;
-    }
-
-    const idx: any = {};
-    headers.forEach((h,i)=>idx[h]=i);
-    const parsed = lines.slice(1).map(raw => {
-      const c = raw.split(sep);
-      const code = (c[idx["code"]] ?? "").trim();
-      let requestedHt = 0;
-      if (hasA) requestedHt = numFR(c[idx["montant_ht"]] ?? "");
-      else requestedHt = numFR(c[idx["quantite"]] ?? "") * numFR(c[idx["pu_ht"]] ?? "");
-      return { code, requestedHt };
-    }).filter(r => r.code && r.requestedHt>0);
-
-    // Match par code
-    const good:any[] = [];
-    const bad:any[] = [];
-    for (const r of parsed) {
-      const key = r.code.trim().toLowerCase();
-      const d = dpgfByCode.get(key);
-      if (!d) { bad.push(r); continue; }
-      good.push({ dpgfLineId: d.id, requestedHt: r.requestedHt, code: r.code, description: d.description });
-    }
-    setRows(good);
-    setUnknown(bad);
-  }
-
-  const total = useMemo(()=> rows.reduce((s,r)=>s+r.requestedHt,0), [rows]);
-
-  async function onCreate() {
-    setBusy(true); setErr(null); setMsg(null);
+  async function createFacture() {
+    if (!marche) return;
+    setBusy(true); setErr(null); setOkMsg(null);
     try {
-      if (!numero.trim()) throw new Error("Renseigne le numéro de facture.");
-      if (!rows.length) throw new Error("Aucune ligne valide à créer.");
+      // On a besoin de projectId / entrepriseId pour l’API POST /api/factures
+      // On suppose que /api/marches/[id] renvoie { projectId, entrepriseId } dans ton implémentation.
+      // Si non, on fait un fetch ciblé :
+      const mr = await fetch(`/api/marches/${id}`, { cache: "no-store" });
+      const md = await mr.json();
+      if (!mr.ok) throw new Error(md?.error || `Marché ${id} introuvable`);
 
-      const payload = {
-        projectId: marche.projectId,
-        entrepriseId: marche.entrepriseId,
-        marcheId: Number(marcheId),
-        numero: numero.trim(),
-        lines: rows.map(r => ({ dpgfLineId: r.dpgfLineId, requestedHt: r.requestedHt }))
+      const body = {
+        projectId: md.projectId,
+        entrepriseId: md.entrepriseId,
+        marcheId: Number(id),
+        numero: numero.trim() || `F-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+        lines: Object.entries(req)
+          .map(([dpgfLineId, requestedHt]) => ({
+            dpgfLineId: Number(dpgfLineId),
+            requestedHt: parseFloat(requestedHt || "0") || 0,
+          }))
+          .filter((l) => l.requestedHt > 0),
       };
+
+      if (body.lines.length === 0) throw new Error("Aucune ligne demandée (> 0 €)");
 
       const res = await fetch("/api/factures", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || `Erreur ${res.status}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
 
-      setMsg(`Facture ${data.numero} créée (id: ${data.id}).`);
-    } catch (e:any) {
-      setErr(e.message || "Erreur inconnue");
+      setOkMsg(`Facture créée (#${d.id})`);
+      // Ouvre la page de validation
+      window.location.href = `/validation/${d.id}`;
+    } catch (e: any) {
+      setErr(e.message || "Erreur création facture");
     } finally {
       setBusy(false);
     }
   }
 
+  const f = (n: number) => (n || 0).toLocaleString("fr-FR") + " €";
+
+  if (err) return <div className="p-6 text-red-600">{err}</div>;
+  if (!marche) return <div className="p-6">Chargement…</div>;
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Nouvelle facture — Marché #{marcheId}</h1>
-        <Link href={`/marches/${marcheId}`} className="text-blue-600 hover:underline">← Retour marché</Link>
+    <div className="p-6 space-y-6">
+      <div className="text-2xl font-bold">Nouvelle facture — Marché {marche.reference || marche.id}</div>
+      <div className="text-sm text-slate-600">
+        Projet : {marche.project?.name || "-"} • Entreprise : {marche.entreprise?.name || "-"}
       </div>
 
-      {err && <div className="rounded bg-red-50 text-red-700 p-3">{err}</div>}
-      {msg && <div className="rounded bg-green-50 text-green-700 p-3">{msg}</div>}
+      {(okMsg) && <div className="rounded border p-3 bg-emerald-50 border-emerald-300 text-emerald-800">{okMsg}</div>}
 
-      <div className="rounded border bg-white p-4 space-y-3">
-        <div className="flex gap-4 items-center">
-          <label className="text-sm font-medium">Numéro de facture</label>
-          <input
-            className="border rounded px-2 py-1"
-            placeholder="F-2025-001"
-            value={numero}
-            onChange={(e)=>setNumero(e.target.value)}
-          />
+      <div className="rounded border p-4 bg-white grid md:grid-cols-3 gap-2">
+        <input
+          className="rounded border px-2 py-1"
+          placeholder="Numéro de facture (ex: F-2025-001)"
+          value={numero}
+          onChange={(e) => setNumero(e.target.value)}
+        />
+        <div className="text-sm text-slate-600 col-span-2 self-center">
+          Laisse vide pour générer automatiquement un numéro unique.
         </div>
+      </div>
 
-        <div className="text-sm">
-          <b>CSV accepté</b> (séparateur “;” ou “,”)
-          <div className="mt-1 font-mono">
-            Variante A: code;montant_ht
-          </div>
-          <div className="font-mono text-slate-600">
-            CAR-001;1200
-          </div>
-          <div className="mt-1 font-mono">
-            Variante B: code;quantite;pu_ht
-          </div>
-          <div className="font-mono text-slate-600">
-            CAR-002;35;33
-          </div>
-        </div>
-
-        <input type="file" accept=".csv,text/csv" onChange={onFile} />
-
-        {rows.length > 0 && (
-          <div className="rounded border bg-white overflow-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left">
-                <tr>
-                  <th className="px-3 py-2">Code</th>
-                  <th className="px-3 py-2">Description</th>
-                  <th className="px-3 py-2 text-right">Demandé (HT)</th>
+      <div className="rounded border overflow-hidden bg-white">
+        <table className="w-full text-sm border-collapse">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="px-2 py-2 text-left w-24">Code</th>
+              <th className="px-2 py-2 text-left">Description</th>
+              <th className="px-2 py-2 text-right w-28">Total HT</th>
+              <th className="px-2 py-2 text-right w-28">Déjà validé</th>
+              <th className="px-2 py-2 text-right w-32">Demandé HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((l) => {
+              const restant = Math.max(0, (l.totalHt || 0) - (l.validatedHt || 0));
+              const disabled = restant <= 0;
+              return (
+                <tr key={l.id} className={`border-t ${disabled ? "opacity-50" : ""}`}>
+                  <td className="px-2 py-1">{l.code || "-"}</td>
+                  <td className="px-2 py-1">{l.description || "-"}</td>
+                  <td className="px-2 py-1 text-right">{f(l.totalHt || 0)}</td>
+                  <td className="px-2 py-1 text-right">{f(l.validatedHt || 0)}</td>
+                  <td className="px-2 py-1 text-right">
+                    <input
+                      className="w-28 rounded border px-2 py-1 text-right"
+                      type="number"
+                      min={0}
+                      max={restant}
+                      step="0.01"
+                      disabled={disabled}
+                      value={req[l.id] ?? "0"}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(restant, parseFloat(e.target.value || "0") || 0));
+                        setReq((s) => ({ ...s, [l.id]: String(v) }));
+                      }}
+                      title={disabled ? "Ligne soldée" : `Max: ${restant.toLocaleString("fr-FR")} €`}
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((r,i)=>(
-                  <tr key={i} className="border-t">
-                    <td className="px-3 py-2">{r.code}</td>
-                    <td className="px-3 py-2">{r.description}</td>
-                    <td className="px-3 py-2 text-right">{r.requestedHt.toLocaleString("fr-FR")} €</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-slate-50">
-                <tr>
-                  <td className="px-3 py-2 font-medium" colSpan={2}>Total demandé</td>
-                  <td className="px-3 py-2 text-right font-semibold">{total.toLocaleString("fr-FR")} €</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-slate-50 border-t">
+            <tr>
+              <td className="px-2 py-2 font-medium" colSpan={4}>Total demandé</td>
+              <td className="px-2 py-2 text-right font-semibold">
+                {totalDemande.toLocaleString("fr-FR")} €
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
-        {unknown.length > 0 && (
-          <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">
-            <b>Codes inconnus (non trouvés dans le DPGF):</b>
-            <ul className="list-disc pl-6">
-              {unknown.map((u,i)=> <li key={i}>{u.code} — {u.requestedHt.toLocaleString("fr-FR")} €</li>)}
-            </ul>
-            <div className="mt-1 text-amber-700">
-              Vérifie que les <b>codes</b> de ton CSV = codes DPGF du marché.
-            </div>
-          </div>
-        )}
-
-        <div>
-          <button
-            onClick={onCreate}
-            disabled={busy || !numero.trim() || rows.length===0}
-            className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {busy ? "Création…" : "Créer la facture"}
-          </button>
-        </div>
+      <div className="flex gap-2">
+        <button
+          onClick={createFacture}
+          disabled={busy}
+          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy ? "Création…" : "Créer la facture"}
+        </button>
+        <a
+          href={`/marches/${id}/budget`}
+          target="_blank"
+          className="rounded border px-3 py-2 text-sm hover:bg-slate-50"
+        >
+          Budget du marché
+        </a>
       </div>
     </div>
   );
