@@ -1,0 +1,185 @@
+import { use, useEffect, useMemo, useState } from "react";"use client";
+import { use, useEffect, useMemo, useState, use } from "react";
+
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id: factureId } = use(params); // Next 15: params est une Promise
+  const [facture, setFacture] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/factures/${factureId}`, { cache: "no-store" });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
+        setFacture(d);
+      } catch (e: any) {
+        setErr(e.message || "Erreur inconnue");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [factureId]);
+
+{/* === Paramètres facture (TVA / RG / DGD) === */}
+<FactureSettings factureId={factureId} />
+
+
+
+
+
+  if (loading) return <div className="p-6">Chargement…</div>;
+  if (err)     return <div className="p-6 text-red-600">{err}</div>;
+  if (!facture) return <div className="p-6">Facture introuvable.</div>;
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Validation — Facture {facture.numero}</h1>
+
+        {/* ✅ Liens actions */}
+        <div className="flex gap-2">
+          <a
+            href={`/pp/${factureId}`}
+            className="rounded border px-3 py-1 text-sm hover:bg-slate-50"
+            target="_blank"
+          >
+            Ouvrir la PP
+          </a>
+          <a
+            href={`/factures/${factureId}/print`}
+            className="rounded border px-3 py-1 text-sm hover:bg-slate-50"
+            target="_blank"
+          >
+            Imprimer la facture
+          </a>
+        </div>
+      </div>
+
+      {/* … ici conserve/rajoute tes composants de validation des lignes … */}
+      <div className="rounded border bg-white p-4">
+        <div className="text-sm text-slate-600 mb-2">
+          (ex.) Aperçu des lignes (demandé / validé)
+        </div>
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50 text-left">
+            <tr>
+              <th className="px-3 py-2">Code</th>
+              <th className="px-3 py-2">Description</th>
+              <th className="px-3 py-2 text-right">Demandé HT</th>
+              <th className="px-3 py-2 text-right">Validé HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(facture.lignes || []).map((l: any) => (
+              <tr key={l.id} className="border-t">
+                <td className="px-3 py-2">{l.dpgf?.code || "-"}</td>
+                <td className="px-3 py-2">{l.dpgf?.description || "-"}</td>
+                <td className="px-3 py-2 text-right">{(l.requestedHt || 0).toLocaleString("fr-FR")} €</td>
+                <td className="px-3 py-2 text-right">{(l.validatedHt ?? 0).toLocaleString("fr-FR")} €</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+function FactureSettings({ factureId }: { factureId: string }) {
+  const [meta, setMeta] = useState<{ tvaRate: string; retenuePct: string; isDgd: boolean }>({
+    tvaRate: "20",
+    retenuePct: "5",
+    isDgd: false,
+  });
+  const [tot, setTot] = useState<{ baseHt: number; tva: number; rgRetenue: number; ttcAPayer: number } | null>(null);
+  const [msg, setMsg] = useState<string|null>(null);
+  const [err, setErr] = useState<string|null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function loadTotals() {
+    setErr(null);
+    const res = await fetch(`/api/factures/${factureId}/totals`, { cache: "no-store" });
+    const d = await res.json();
+    if (!res.ok) { setErr(d?.error || `Erreur ${res.status}`); return; }
+    setMeta({
+      tvaRate: String(d.params.tvaRate ?? 20),
+      retenuePct: String(d.params.retenuePct ?? 5),
+      isDgd: !!d.params.isDgd,
+    });
+    setTot(d.totals);
+  }
+  useEffect(() => { loadTotals(); }, [factureId]);
+
+  async function saveMeta() {
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      const res = await fetch(`/api/factures/${factureId}/meta`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          tvaRate: parseFloat(meta.tvaRate || "0"),
+          retenuePct: parseFloat(meta.retenuePct || "0"),
+          isDgd: !!meta.isDgd,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
+      setMsg("Paramètres enregistrés.");
+      await loadTotals();
+    } catch (e:any) {
+      setErr(e.message || "Erreur inconnue");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="rounded border bg-white p-4 space-y-3">
+      <div className="text-sm font-semibold">Paramètres facture</div>
+
+      {err && <div className="rounded bg-red-50 text-red-700 p-3">{err}</div>}
+      {msg && <div className="rounded bg-green-50 text-green-700 p-3">{msg}</div>}
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-slate-600">TVA (%)</label>
+          <input type="number" step="0.1" className="border rounded px-2 py-1 w-full"
+                 value={meta.tvaRate}
+                 onChange={(e)=>setMeta(m=>({ ...m, tvaRate: e.target.value }))} />
+        </div>
+        <div>
+          <label className="text-xs text-slate-600">Retenue de garantie (%)</label>
+          <input type="number" step="0.1" className="border rounded px-2 py-1 w-full"
+                 value={meta.retenuePct}
+                 onChange={(e)=>setMeta(m=>({ ...m, retenuePct: e.target.value }))} />
+        </div>
+        <div className="flex items-end">
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={meta.isDgd}
+                   onChange={(e)=>setMeta(m=>({ ...m, isDgd: e.target.checked }))} />
+            DGD (lever la RG)
+          </label>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={saveMeta} disabled={busy} className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+          {busy ? "Enregistrement…" : "Enregistrer"}
+        </button>
+        <button onClick={loadTotals} className="rounded border px-4 py-2">Recalculer</button>
+      </div>
+
+      {tot && (
+        <div className="rounded border bg-white overflow-hidden">
+          <table className="min-w-full text-sm">
+            <tbody>
+              <tr><td className="px-3 py-2">Base HT</td><td className="px-3 py-2 text-right">{tot.baseHt.toLocaleString("fr-FR")} €</td></tr>
+              <tr><td className="px-3 py-2">TVA</td><td className="px-3 py-2 text-right">{tot.tva.toLocaleString("fr-FR")} €</td></tr>
+              <tr><td className="px-3 py-2">Retenue de garantie {meta.isDgd ? "(levée au DGD)" : `(${meta.retenuePct} %)`}</td><td className="px-3 py-2 text-right">{tot.rgRetenue.toLocaleString("fr-FR")} €</td></tr>
+              <tr className="bg-slate-50 font-semibold"><td className="px-3 py-2">TTC à payer</td><td className="px-3 py-2 text-right">{tot.ttcAPayer.toLocaleString("fr-FR")} €</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

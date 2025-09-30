@@ -1,0 +1,17 @@
+# Dépendances Node
+/node_modules
+
+# Fichiers de build Next.js
+/.next/
+
+# Base de données locale
+/prisma/dev.db
+
+# Variables d'environnement
+.env
+
+# Fichiers temporaires de VSC (si utilisés)
+.vscode/
+
+# Fichiers de logs
+*.log
