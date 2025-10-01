@@ -9,7 +9,7 @@ const prisma = new PrismaClient;
  * - statut: "EN_ATTENTE" | "VALIDEE" | "REFUSEE"
  * - dateMin, dateMax: yyyy-mm-dd
  * - amountMin, amountMax: number (HT sur la facture: somme validatedHt || requestedHt)
- * - q: string (search sur facture.numero + lignes.dpgf.description/code)
+ * - q: string (search sur facture.numero + lignes.dpgfLine?. description/code)
  * - limit, offset: pagination simple (par défaut 100 / 0)
  */
 export async function GET(req: Request) {
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       project: true,
       entreprise: true,
       marche: true,
-      lignes: { include: { dpgf: true } },
+      lignes: { include: { dpgfLine: true } },
     },
     orderBy: { date: "desc" },
     take: limit,
@@ -62,8 +62,8 @@ export async function GET(req: Request) {
     if (q) {
       const hay = [
         f.numero || "",
-        ...(f.lignes || []).map(l => l.dpgf?.code || ""),
-        ...(f.lignes || []).map(l => l.dpgf?.description || ""),
+        ...(f.lignes || []).map(l => l.dpgfLine?.code || ""),
+        ...(f.lignes || []).map(l => l.dpgfLine?.description || ""),
       ].join(" ").toLowerCase();
       if (!hay.includes(q.toLowerCase())) return false;
     }

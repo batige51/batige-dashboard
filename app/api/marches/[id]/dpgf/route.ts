@@ -5,9 +5,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const marcheId = parseInt(params.id, 10);
+  const { id } = await context.params;      // ✅ Next 15: params est une Promise
+  const marcheId = parseInt(id, 10);
 
   if (isNaN(marcheId)) {
     return NextResponse.json({ error: "ID marché invalide" }, { status: 400 });
@@ -19,7 +20,7 @@ export async function GET(
       orderBy: { id: "asc" },
     });
     return NextResponse.json(lignes);
-  } catch (e: any) {
+  } catch (e) {
     console.error("Erreur DPGF:", e);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }

@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /** GET /api/marches/[id]/budget  (id = marché) */
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const mid = parseInt(id, 10);
   if (isNaN(mid)) return NextResponse.json({ error: "ID marché invalide" }, { status: 400 });

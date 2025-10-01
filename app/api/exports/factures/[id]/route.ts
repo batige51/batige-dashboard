@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { toCsv } from "@/app/lib/csv";
-
 const prisma = new PrismaClient();
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+// Export JSON d'une facture + ses lignes
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const fid = parseInt(id, 10);
-  if (isNaN(fid)) return NextResponse.json({ error: "ID facture invalide" }, { status: 400 });
+  if (isNaN(fid)) return NextResponse.json({ error: "ID invalide" }, { status: 400 });
 
   const facture = await prisma.facture.findUnique({
     where: { id: fid },
@@ -15,56 +14,39 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       project: true,
       marche: true,
       entreprise: true,
-      lignes: { include: { dpgf: true }, orderBy: { id: "asc" } },
+      // ⚠️ Nom correct de la relation: dpgfLine (pas dpgf)
+      lignes: { include: { dpgfLine: true }, orderBy: { id: "asc" } },
     },
   });
+
   if (!facture) return NextResponse.json({ error: "Facture introuvable" }, { status: 404 });
 
-  const header = [
-    ["Facture", facture.numero],
-    ["Date", new Date(facture.date).toLocaleDateString("fr-FR")],
-    ["Statut", facture.statut],
-    ["Projet", facture.project?.name ?? ""],
-    ["Marché", facture.marche?.reference ?? ""],
-    ["Entreprise", facture.entreprise?.name ?? ""],
-    ["TVA %", facture.tvaRate ?? 0],
-    ["RG %", facture.retenuePct ?? 0],
-    ["DGD", facture.isDgd ? "oui" : "non"],
-    [],
-  ];
-
-  const body = [
-    ["code", "description", "demande_ht", "valide_ht"],
-    ...(facture.lignes || []).map((l) => [
-      l.dpgf?.code ?? "",
-      l.dpgf?.description ?? "",
-      l.requestedHt ?? 0,
-      l.validatedHt ?? 0,
-    ]),
-  ];
-
-  const totalHT = (facture.lignes || []).reduce((s, l) => s + (l.validatedHt ?? l.requestedHt ?? 0), 0);
-  const tva = totalHT * ((facture.tvaRate ?? 0) / 100);
-  const ttc = totalHT + tva;
-  const rgPct = facture.isDgd ? 0 : (facture.retenuePct ?? 0);
-  const rg = totalHT * (rgPct / 100);
-  const net = ttc - rg;
-
-  const totals = [
-    [],
-    ["TOTAL_HT", totalHT],
-    ["TVA", tva],
-    ["TTC", ttc],
-    ["RG", -rg],
-    ["NET_A_PAYER", net],
-  ];
-
-  const csv = toCsv([...header, ...body, ...totals]);
-  return new Response(csv, {
-    headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="facture_${fid}.csv"`,
-      "cache-control": "no-store",
+  const payload = {
+    facture: {
+      id: facture.id,
+      numero: facture.numero,
+      date: facture.date,
+      statut: facture.statut,
+      tvaRate: facture.tvaRate,
+      retenuePct: facture.retenuePct,
+      isDgd: facture.isDgd,
     },
-  });
+    project: { id: facture.project.id, name: facture.project.name },
+    marche: { id: facture.marche.id, reference: facture.marche.reference },
+    entreprise: { id: facture.entreprise.id, name: facture.entreprise.name },
+    lignes: (facture.lignes || []).map((l) => ({
+      id: l.id,
+      dpgfLineId: l.dpgfLineId,
+      code: l.dpgfLine?.code ?? null,
+      description: l.dpgfLine?.description ?? null,
+      unite: l.dpgfLine?.unite ?? null,
+      qty: l.dpgfLine?.qty ?? null,
+      unitPriceHt: l.dpgfLine?.unitPriceHt ?? null,
+      totalHt: l.dpgfLine?.totalHt ?? null,
+      requestedHt: l.requestedHt ?? 0,
+      validatedHt: l.validatedHt ?? 0,
+    })),
+  };
+
+  return NextResponse.json(payload);
 }

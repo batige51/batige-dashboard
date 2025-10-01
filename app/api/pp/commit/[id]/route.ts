@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /**
  * POST /api/pp/commit/[id]  (id = facture)
  */
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const fid = parseInt(id, 10);
   if (isNaN(fid)) return NextResponse.json({ error: "ID facture invalide" }, { status: 400 });
@@ -14,7 +14,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     where: { id: fid },
     include: {
       pp: true,
-      lignes: { include: { dpgf: true }, orderBy: { id: "asc" } },
+      lignes: { include: { dpgfLine: true }, orderBy: { id: "asc" } },
       project: true,
       entreprise: true,
       marche: true,
@@ -24,7 +24,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if (facture.pp) return NextResponse.json({ error: "PP déjà existante", ppId: facture.pp.id }, { status: 409 });
 
   const rows = (facture.lignes || []).map((fl) => {
-    const d = fl.dpgf!;
+    const d = fl.dpgfLine!;
     const previousHt = Math.max(0, (d.validatedHt || 0) - (fl.validatedHt || 0));
     const currentHt = (fl.validatedHt != null ? fl.validatedHt : fl.requestedHt) || 0;
     const remainingHt = Math.max(0, (d.totalHt || 0) - (previousHt + currentHt));

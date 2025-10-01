@@ -38,30 +38,30 @@ model Project {
   updatedAt DateTime      @updatedAt
 
   // Relations
-  markets   Marche[]
-  factures  Facture[]
-  lots      Lot[]
+  markets  Marche[]
+  factures Facture[]
+  lots     Lot[]
 }
 
 model Entreprise {
-  id        Int           @id @default(autoincrement())
-  name      String
-  siret     String?
-  contact   String?
+  id      Int     @id @default(autoincrement())
+  name    String
+  siret   String?
+  contact String?
 
   // Relations
-  marches   Marche[]
-  factures  Facture[]
+  marches  Marche[]
+  factures Facture[]
 }
 
 model Marche {
-  id                Int                 @id @default(autoincrement())
-  projectId         Int
-  entrepriseId      Int
-  reference         String?
-  montantInitialHt  Float               @default(0)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id               Int      @id @default(autoincrement())
+  projectId        Int
+  entrepriseId     Int
+  reference        String?
+  montantInitialHt Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   project           Project             @relation(fields: [projectId], references: [id])
@@ -73,17 +73,17 @@ model Marche {
 }
 
 model DpgfLine {
-  id           Int           @id @default(autoincrement())
-  marcheId     Int
-  code         String?
-  description  String
-  unite        String?
-  qty          Float         @default(0)
-  unitPriceHt  Float         @default(0)
-  totalHt      Float         @default(0)
-  validatedHt  Float         @default(0) // cumul validé sur toutes factures
-  lot          String?
-  idx          Int?
+  id          Int     @id @default(autoincrement())
+  marcheId    Int
+  code        String?
+  description String
+  unite       String?
+  qty         Float   @default(0)
+  unitPriceHt Float   @default(0)
+  totalHt     Float   @default(0)
+  validatedHt Float   @default(0) // cumul validé sur toutes factures
+  lot         String?
+  idx         Int?
 
   // Relations
   marche       Marche        @relation(fields: [marcheId], references: [id])
@@ -102,29 +102,29 @@ model Facture {
   statut       FactureStatut @default(EN_ATTENTE)
 
   // Paramètres financiers (par facture)
-  tvaRate     Float   @default(20)     // taux TVA %
-  retenuePct  Float   @default(5)      // RG %
-  isDgd       Boolean @default(false)  // DGD (levée de RG)
+  tvaRate    Float   @default(20) // taux TVA %
+  retenuePct Float   @default(5) // RG %
+  isDgd      Boolean @default(false) // DGD (levée de RG)
 
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id])
-  entreprise  Entreprise @relation(fields: [entrepriseId], references: [id])
-  marche      Marche    @relation(fields: [marcheId], references: [id])
+  project     Project              @relation(fields: [projectId], references: [id])
+  entreprise  Entreprise           @relation(fields: [entrepriseId], references: [id])
+  marche      Marche               @relation(fields: [marcheId], references: [id])
   lignes      FactureLine[]
   pp          PropositionPaiement?
   attachments Attachment[]
 }
 
 model FactureLine {
-  id          Int      @id @default(autoincrement())
+  id          Int   @id @default(autoincrement())
   factureId   Int
   dpgfLineId  Int
-  requestedHt Float    @default(0)
-  validatedHt Float    @default(0)
+  requestedHt Float @default(0)
+  validatedHt Float @default(0)
 
   // Relations
-  facture     Facture  @relation(fields: [factureId], references: [id])
-  dpgfLine    DpgfLine @relation(fields: [dpgfLineId], references: [id])
+  facture  Facture  @relation(fields: [factureId], references: [id])
+  dpgfLine DpgfLine @relation(fields: [dpgfLineId], references: [id])
 }
 
 //
@@ -139,7 +139,7 @@ model PropositionPaiement {
 
   // Relations
   lines   PpLine[]
-  facture Facture @relation(fields: [factureId], references: [id])
+  facture Facture  @relation(fields: [factureId], references: [id])
 }
 
 model PpLine {
@@ -185,41 +185,41 @@ model AvenantLine {
 // ⬇️ Grille client & Ventes actées
 //
 model Lot {
-  id              Int          @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
   projectId       Int
   numero          String
   typologie       String?
   surface         Float?
-  prixCatalogueHt Float        @default(0)
+  prixCatalogueHt Float   @default(0)
 
   // Relations
-  project         Project      @relation(fields: [projectId], references: [id])
-  ventes          VenteActee[]
+  project Project      @relation(fields: [projectId], references: [id])
+  ventes  VenteActee[]
 }
 
 model VenteActee {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   lotId       Int
   client      String
-  date        DateTime  @default(now())
-  prixVenteHt Float     @default(0) // prix conclus (hors TMA)
-  tvaRate     Float     @default(0) // ex: 20 pour 20%
-  tmaTotalHt  Float     @default(0) // total TMA (HT)
+  date        DateTime @default(now())
+  prixVenteHt Float    @default(0) // prix conclus (hors TMA)
+  tvaRate     Float    @default(0) // ex: 20 pour 20%
+  tmaTotalHt  Float    @default(0) // total TMA (HT)
 
   // Relations
-  lot         Lot       @relation(fields: [lotId], references: [id])
-  tmas        TmaLine[]
+  lot  Lot       @relation(fields: [lotId], references: [id])
+  tmas TmaLine[]
 }
 
 model TmaLine {
-  id          Int        @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   venteId     Int
   code        String?
   description String
   deltaHt     Float // + pour plus-value, - pour moins-value
 
   // Relations
-  vente       VenteActee @relation(fields: [venteId], references: [id])
+  vente VenteActee @relation(fields: [venteId], references: [id])
 }
 
 //
@@ -231,12 +231,12 @@ model Attachment {
   fileName  String
   mimeType  String
   size      Int
-  url       String   // ex: /uploads/1699999999999_monfichier.pdf
+  url       String // ex: /uploads/1699999999999_monfichier.pdf
 
   // Liens optionnels (une PJ peut être liée à une Facture OU un Marché)
   factureId Int?
   marcheId  Int?
 
-  facture   Facture? @relation(fields: [factureId], references: [id])
-  marche    Marche?  @relation(fields: [marcheId], references: [id])
+  facture Facture? @relation(fields: [factureId], references: [id])
+  marche  Marche?  @relation(fields: [marcheId], references: [id])
 }

@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // Agrégations budget d'un projet : totaux DPGF, validé, restant, par marché & entreprise.
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const pid = parseInt(id, 10);
   if (isNaN(pid)) return NextResponse.json({ error: "ID projet invalide" }, { status: 400 });

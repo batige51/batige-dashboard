@@ -1,49 +1,49 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { toCsv } from "@/app/lib/csv";
-
 const prisma = new PrismaClient();
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { id } = await ctx.params;
-  const mid = parseInt(id, 10);
-  if (isNaN(mid)) return NextResponse.json({ error: "ID marché invalide" }, { status: 400 });
+// Export JSON de la DPGF d'un marché
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const mid = Number(id);
+  if (!Number.isFinite(mid)) {
+    return NextResponse.json({ error: "ID marché invalide" }, { status: 400 });
+  }
 
   const marche = await prisma.marche.findUnique({
     where: { id: mid },
-    include: { dpgf: { orderBy: { id: "asc" } }, entreprise: true, project: true },
-  });
-  if (!marche) return NextResponse.json({ error: "Marché introuvable" }, { status: 404 });
-
-  const header = [
-    ["Projet", marche.project?.name ?? ""],
-    ["Marché", marche.reference ?? `MAR-${marche.id}`],
-    ["Entreprise", marche.entreprise?.name ?? ""],
-    [],
-  ];
-
-  const table = [
-    ["id", "code", "description", "unite", "quantite", "pu_ht", "total_ht", "valide_cumul_ht", "lot", "idx"],
-    ...marche.dpgf.map((l) => [
-      l.id,
-      l.code ?? "",
-      l.description ?? "",
-      l.unite ?? "",
-      l.qty ?? 0,
-      l.unitPriceHt ?? 0,
-      l.totalHt ?? 0,
-      l.validatedHt ?? 0,
-      l.lot ?? "",
-      l.idx ?? "",
-    ]),
-  ];
-
-  const csv = toCsv([...header, ...table]);
-  return new Response(csv, {
-    headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="dpgf_marche_${mid}.csv"`,
-      "cache-control": "no-store",
+    include: {
+      project: true,
+      entreprise: true,
+      dpgf: true, // relation sur Marche = "dpgf"
     },
+  });
+
+  if (!marche) {
+    return NextResponse.json({ error: "Marché introuvable" }, { status: 404 });
+  }
+
+  const dpgf = (marche.dpgf || []).map((l) => ({
+    id: l.id,
+    code: l.code ?? "",
+    description: l.description ?? "",
+    unite: l.unite ?? "",
+    quantite: l.qty ?? 0,
+    pu_ht: l.unitPriceHt ?? 0,
+    total_ht: l.totalHt ?? 0,
+    valide_cumul_ht: l.validatedHt ?? 0,
+    lot: l.lot ?? "",
+    idx: l.idx ?? null,
+  }));
+
+  return NextResponse.json({
+    marche: {
+      id: marche.id,
+      reference: marche.reference,
+      montantInitialHt: marche.montantInitialHt,
+      project: { id: marche.project.id, name: marche.project.name },
+      entreprise: { id: marche.entreprise.id, name: marche.entreprise.name },
+    },
+    dpgf,
   });
 }
