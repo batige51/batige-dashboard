@@ -1,16 +1,22 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Nav } from "./components/Nav";
 
-export const metadata: Metadata = { title: "BATIGE", description: "Gestion chantiers" };
+export const metadata: Metadata = {
+  title: "BATIGE Dashboard",
+  description: "Gestion des projets et marchés",
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="fr">
-      <body className="bg-slate-50 text-slate-900">
-        <Nav />
-        <main className="max-w-6xl mx-auto px-4 py-4">{children}</main>
+    <html lang="fr" suppressHydrationWarning>
+      <body className="bg-background text-foreground antialiased">
+        {children}
       </body>
     </html>
   );
 }
+

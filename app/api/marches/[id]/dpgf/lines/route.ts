@@ -1,6 +1,6 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 
 /** POST /api/marches/[id]/dpgf/lines  body: { code?, description, unite?, qty, unitPriceHt } */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {

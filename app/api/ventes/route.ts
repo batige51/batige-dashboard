@@ -1,6 +1,6 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 
 // Créer une vente actée pour un lot
 export async function POST(req: Request) {

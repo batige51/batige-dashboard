@@ -1,6 +1,6 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
 import { NextResponse, NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 
 /** GET /api/marches/[id]/budget  (id = marché) */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

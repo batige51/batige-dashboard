@@ -1,31 +1,35 @@
-import { NextResponse } from "next/server";
-import { PrismaClient, AvenantStatut } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
+import { NextRequest, NextResponse } from "next/server";
 
-/** POST /api/avenants  body: { marcheId, numero, date?, statut?, lines:[{ dpgfLineId, deltaHt }] } */
-export async function POST(req: Request) {
-  const b = await req.json();
-  const marcheId = parseInt(b.marcheId, 10);
-  if (isNaN(marcheId)) return NextResponse.json({ error: "marcheId invalide" }, { status: 400 });
+/**
+ * GET /api/avenants?marcheId=123
+ * POST /api/avenants  { marcheId, numero? }
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const marcheId = Number(searchParams.get("marcheId"));
+  if (!marcheId) return NextResponse.json({ error: "marcheId requis" }, { status: 400 });
 
-  const data: any = {
-    marcheId,
-    numero: String(b.numero || "").trim() || "AV-??",
-    statut: b.statut && AvenantStatut[b.statut as keyof typeof AvenantStatut] ? b.statut : "BROUILLON",
-    date: b.date ? new Date(b.date) : new Date(),
-  };
+  const avenants = await prisma.avenantEntreprise.findMany({
+    where: { marcheId },
+    include: { lines: { include: { dpgfLine: true } } },
+    orderBy: { id: "desc" },
+  });
 
-  const lines = Array.isArray(b.lines) ? b.lines.map((l:any)=>({
-    dpgfLineId: Number(l.dpgfLineId),
-    deltaHt: Number(l.deltaHt||0),
-  })) : [];
+  return NextResponse.json({ items: avenants });
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({} as any));
+  const marcheId = Number(body.marcheId);
+  const numero = body.numero ?? null;
+
+  if (!marcheId) return NextResponse.json({ error: "marcheId requis" }, { status: 400 });
 
   const created = await prisma.avenantEntreprise.create({
-    data: {
-      ...data,
-      lines: lines.length ? { createMany: { data: lines } } : undefined,
-    },
-    include: { lines: true },
+    data: { marcheId, numero: numero ?? `AV-${Date.now()}` },
   });
-  return NextResponse.json(created, { status: 201 });
+
+  return NextResponse.json({ item: created }, { status: 201 });
 }

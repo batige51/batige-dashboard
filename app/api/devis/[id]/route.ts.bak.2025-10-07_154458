@@ -1,0 +1,42 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+// ✅ Correction Next.js 15 : on récupère params depuis un contexte asynchrone
+export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const marcheId = Number(id);
+
+  try {
+    const marche = await prisma.marche.findUnique({
+      where: { id: marcheId },
+      include: {
+        project: true,
+        entreprise: true,
+        dpgf: true,
+        AvenantEntreprise: {
+          include: { lines: true },
+        },
+      },
+    });
+
+    if (!marche) {
+      return NextResponse.json({ error: "Marché introuvable" }, { status: 404 });
+    }
+
+    const montantHt = marche.dpgf.reduce((sum, l) => sum + (l.totalHt || 0), 0);
+    const totalApresRemise = montantHt + (marche.remiseHt || 0);
+
+    return NextResponse.json({
+      marche,
+      dpgf: marche.dpgf,
+      avenants: marche.AvenantEntreprise,
+      totalHt: montantHt,
+      totalApresRemise,
+    });
+  } catch (error: any) {
+    console.error("Erreur GET devis :", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

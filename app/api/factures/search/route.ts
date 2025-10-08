@@ -1,6 +1,8 @@
+import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client"; // ✅ on importe uniquement le namespace de types
 import { NextResponse } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
-const prisma = new PrismaClient;
+
+export const runtime = "nodejs";
 
 /**
  * Query params acceptés:

@@ -1,6 +1,6 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
 import { NextResponse, NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 
 /** PATCH /api/dpgf/[id]  body: { code?, description?, unite?, qty?, unitPriceHt? } */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -11,8 +11,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const b = await req.json();
 
   // recalcul total si qty ou unitPrice changent
-  let qty: number | undefined = b.qty != null ? Number(b.qty) : undefined;
-  let unit: number | undefined = b.unitPriceHt != null ? Number(b.unitPriceHt) : undefined;
+  const qty: number | undefined = b.qty != null ? Number(b.qty) : undefined;
+  const unit: number | undefined = b.unitPriceHt != null ? Number(b.unitPriceHt) : undefined;
 
   // on lit l’existant pour calculer le total
   const existing = await prisma.dpgfLine.findUnique({ where: { id: lid } });

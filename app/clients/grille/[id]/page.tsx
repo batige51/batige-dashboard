@@ -37,7 +37,7 @@ export default function Page({ params }: { params: Promise<{ projectId: string }
     setLots(Array.isArray(data) ? data : []);
     setLoading(false);
   }
-  useEffect(()=>{ load(); }, [projectId]);
+  useEffect(()=>{ load(); }, [id]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     setErr(null); setMsg(null);

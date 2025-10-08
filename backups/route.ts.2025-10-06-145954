@@ -1,0 +1,24 @@
+// lignes du bloc : on utilise row() pour que label + montant soient sur la même ligne
+row("H.T. :", eur(courantHt), 11, 12);
+row(`T.V.A. ${(tvaRate * 100).toFixed(0)} % :`, eur(tva), 11, 12);
+
+// --- Montant TTC mis en valeur (même alignement mais en gras et souligné) ---
+page.drawText("T.T.C. :", { x: M + 12, y, size: 12, font, color: rgb(0, 0, 0) });
+
+// on dessine le montant en gras visuel et souligné
+const ttcStr = eur(ttc);
+const ttcW = font.widthOfTextAtSize(ttcStr, 12);
+
+// position alignée sur la même colonne que les autres
+const ttcX = AMOUNT_COL - 12 - ttcW;
+page.drawText(ttcStr, { x: ttcX, y, size: 12, font, color: rgb(0, 0, 0) });
+
+// soulignement
+page.drawLine({
+  start: { x: ttcX, y: y - 2 },
+  end: { x: ttcX + ttcW, y: y - 2 },
+  thickness: 0.7,
+  color: rgb(0, 0, 0),
+});
+
+y -= LINE + 10;

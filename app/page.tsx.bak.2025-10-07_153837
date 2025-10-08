@@ -1,0 +1,23 @@
+import BatigeDashboard, { DashboardRoutes, DashboardStats } from "@/components/batige/BatigeDashboard";
+
+export default function Page() {
+  const routes: DashboardRoutes = {
+    dashboard: "/",
+    projects: "/projects",
+    quotesInvoices: "/factures",
+    validation: "/validation",
+    pp: "/pp",
+    budget: "/budget",
+    marchesAvenants: "/marches",
+    importsExports: "/imports",
+    settings: "/settings",
+    newInvoice: "#",
+    importDpgf: "/imports",
+    allProjects: "/projects",
+    allValidations: "/validation",
+  };
+
+  const stats: DashboardStats = {}; // pas de données en dur
+
+  return <BatigeDashboard routes={routes} stats={stats} />;
+}

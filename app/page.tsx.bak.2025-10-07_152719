@@ -1,0 +1,25 @@
+"use client";
+
+import Link from "next/link";
+
+export default function Home() {
+  const routes = {
+    projets: "/projects",
+    budget: "/budget",
+    dpgf: "/devis",
+    factures: "/factures", // ✅ ajout manquant
+  };
+
+  return (
+    <main className="p-8 space-y-4">
+      <h1 className="text-3xl font-bold">BATIGE Dashboard</h1>
+
+      <ul className="list-disc list-inside text-blue-600">
+        <li><Link href={routes.projets}>Voir les projets</Link></li>
+        <li><Link href={routes.dpgf}>Devis (DPGF)</Link></li>
+        <li><Link href={routes.budget}>Budgets</Link></li>
+        <li><Link href={routes.factures}>Factures</Link></li>
+      </ul>
+    </main>
+  );
+}

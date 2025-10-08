@@ -1,0 +1,243 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+//
+// ⬇️ Enums
+//
+enum ProjectStatus {
+  EN_PREPARATION
+  EN_COURS
+  CLOS
+}
+
+enum FactureStatut {
+  EN_ATTENTE
+  VALIDEE
+  REFUSEE
+}
+
+enum AvenantStatut {
+  BROUILLON
+  VALIDE
+}
+
+//
+// ⬇️ Modèles principaux
+//
+model Project {
+  id        Int           @id @default(autoincrement())
+  name      String
+  status    ProjectStatus @default(EN_PREPARATION)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relations
+  markets  Marche[]
+  factures Facture[]
+  lots     Lot[]
+}
+
+model Entreprise {
+  id      Int     @id @default(autoincrement())
+  name    String
+  siret   String?
+  contact String?
+
+  // Relations
+  marches  Marche[]
+  factures Facture[]
+}
+
+model Marche {
+  id               Int      @id @default(autoincrement())
+  projectId        Int
+  entrepriseId     Int
+  reference        String?
+  montantInitialHt Float    @default(0)
+  remiseHt         Float    @default(0)   // <<< AJOUT : remise négative sur le marché	
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entreprise        Entreprise          @relation(fields: [entrepriseId], references: [id]) // pas de cascade ici
+  dpgf              DpgfLine[]
+  factures          Facture[]
+  AvenantEntreprise AvenantEntreprise[]
+  attachments       Attachment[]
+}
+
+model DpgfLine {
+  id          Int     @id @default(autoincrement())
+  marcheId    Int
+  code        String?
+  description String
+  unite       String?
+  qty         Float   @default(0)
+  unitPriceHt Float   @default(0)
+  totalHt     Float   @default(0)
+  validatedHt Float   @default(0) // cumul validé sur toutes factures
+  lot         String?
+  idx         Int?
+
+  // Relations
+  marche       Marche        @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+  factureLines FactureLine[]
+  ppLines      PpLine[]
+  AvenantLine  AvenantLine[]
+}
+
+model Facture {
+  id           Int           @id @default(autoincrement())
+  projectId    Int
+  entrepriseId Int
+  marcheId     Int
+  numero       String
+  date         DateTime      @default(now())
+  statut       FactureStatut @default(EN_ATTENTE)
+
+  // Paramètres financiers (par facture)
+  tvaRate    Float   @default(20) // taux TVA %
+  retenuePct Float   @default(5)  // RG %
+  isDgd      Boolean @default(false) // DGD (levée de RG)
+
+  // Relations
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entreprise  Entreprise           @relation(fields: [entrepriseId], references: [id]) // pas de cascade
+  marche      Marche               @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+  lignes      FactureLine[]
+  pp          PropositionPaiement?
+  attachments Attachment[]
+}
+
+model FactureLine {
+  id          Int   @id @default(autoincrement())
+  factureId   Int
+  dpgfLineId  Int
+  requestedHt Float @default(0)
+  validatedHt Float @default(0)
+
+  // Relations
+  facture  Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
+}
+
+//
+// ⬇️ Proposition de Paiement (PP)
+//
+model PropositionPaiement {
+  id        Int      @id @default(autoincrement())
+  factureId Int      @unique
+  numero    String?
+  totalHt   Float    @default(0)
+  createdAt DateTime @default(now())
+
+  // Relations
+  lines   PpLine[]
+  facture Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+}
+
+model PpLine {
+  id          Int   @id @default(autoincrement())
+  ppId        Int
+  dpgfLineId  Int
+  previousHt  Float @default(0)
+  currentHt   Float @default(0)
+  remainingHt Float @default(0)
+
+  // Relations
+  pp       PropositionPaiement @relation(fields: [ppId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine            @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
+}
+
+//
+// ⬇️ Avenants entreprise
+//
+model AvenantEntreprise {
+  id       Int           @id @default(autoincrement())
+  marcheId Int
+  numero   String
+  date     DateTime      @default(now())
+  statut   AvenantStatut @default(BROUILLON)
+
+  // Relations
+  marche Marche        @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+  lines  AvenantLine[]
+}
+
+model AvenantLine {
+  id         Int   @id @default(autoincrement())
+  avenantId  Int
+  dpgfLineId Int
+  deltaHt    Float // + ou - (HT)
+
+  // Relations
+  avenant  AvenantEntreprise @relation(fields: [avenantId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine          @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
+}
+
+//
+// ⬇️ Grille client & Ventes actées
+//
+model Lot {
+  id              Int     @id @default(autoincrement())
+  projectId       Int
+  numero          String
+  typologie       String?
+  surface         Float?
+  prixCatalogueHt Float   @default(0)
+
+  // Relations
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ventes  VenteActee[]
+}
+
+model VenteActee {
+  id          Int      @id @default(autoincrement())
+  lotId       Int
+  client      String
+  date        DateTime @default(now())
+  prixVenteHt Float    @default(0) // prix conclus (hors TMA)
+  tvaRate     Float    @default(0) // ex: 20 pour 20%
+  tmaTotalHt  Float    @default(0) // total TMA (HT)
+
+  // Relations
+  lot  Lot       @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  tmas TmaLine[]
+}
+
+model TmaLine {
+  id          Int     @id @default(autoincrement())
+  venteId     Int
+  code        String?
+  description String
+  deltaHt     Float // + pour plus-value, - pour moins-value
+
+  // Relations
+  vente VenteActee @relation(fields: [venteId], references: [id], onDelete: Cascade)
+}
+
+//
+// ⬇️ Pièces jointes (FACTURE et/ou MARCHE)
+//
+model Attachment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  fileName  String
+  mimeType  String
+  size      Int
+  url       String // ex: /uploads/1699999999999_monfichier.pdf
+
+  // Liens optionnels (une PJ peut être liée à une Facture OU un Marché)
+  factureId Int?
+  marcheId  Int?
+
+  facture Facture? @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  marche  Marche?  @relation(fields: [marcheId], references: [id], onDelete: Cascade)
+}

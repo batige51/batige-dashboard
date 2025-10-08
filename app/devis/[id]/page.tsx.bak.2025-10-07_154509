@@ -1,0 +1,157 @@
+// app/devis/[id]/page.tsx
+import Link from "next/link";
+
+function eur(n: number) {
+  return (n ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+export default async function DevisDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const marcheId = Number(id);
+
+  // On fait un fetch direct vers l’API locale
+  const res = await fetch(`http://localhost:3000/api/devis/${marcheId}`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="text-red-700 font-semibold">
+          Impossible de charger le devis #{marcheId}
+        </div>
+        <pre className="mt-3 text-xs bg-slate-100 p-3 rounded">{text.slice(0, 400)}</pre>
+        <div className="mt-4">
+          <Link href="/devis" className="text-blue-600 underline">
+            ← Retour à la liste des devis
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const json = await res.json();
+  const data = json?.item;
+  if (!data) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="text-red-700 font-semibold">
+          Données du devis introuvables.
+        </div>
+        <div className="mt-4">
+          <Link href="/devis" className="text-blue-600 underline">
+            ← Retour à la liste des devis
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const montantHt = Number(data.montantHt || 0);
+  const avenantsHt = Number(data.avenantsHt || 0);
+  const totalMarche = montantHt + avenantsHt;
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold">
+          Devis #{data.reference ?? data.id} — {data.project?.name ?? "Projet ?"}
+        </h1>
+        <div className="ml-auto">
+          <Link href="/devis" className="rounded border px-3 py-1.5 hover:bg-slate-50">
+            Retour
+          </Link>
+        </div>
+      </div>
+
+      <div className="text-sm text-slate-600">
+        Entreprise : <b>{data.entreprise?.name ?? "—"}</b>
+      </div>
+
+      {/* Totaux */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-lg border bg-white p-4">
+          <div className="text-sm text-slate-600">Montant HT (devis initial)</div>
+          <div className="text-2xl font-semibold mt-2">{eur(montantHt)}</div>
+        </div>
+        <div className="rounded-lg border bg-white p-4">
+          <div className="text-sm text-slate-600">Avenants / Remises / Déductions (HT)</div>
+          <div className={`text-2xl font-semibold mt-2 ${avenantsHt < 0 ? "text-red-600" : ""}`}>
+            {eur(avenantsHt)}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-white p-4">
+          <div className="text-sm text-slate-600">Total Marché HT</div>
+          <div className="text-2xl font-semibold mt-2">{eur(totalMarche)}</div>
+        </div>
+      </div>
+
+      {/* Table DPGF */}
+      <div className="rounded-lg border bg-white">
+        <div className="border-b px-4 py-3 font-semibold">Lignes DPGF</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="text-left px-3 py-2">Code</th>
+                <th className="text-left px-3 py-2">Description</th>
+                <th className="text-right px-3 py-2">Total HT</th>
+                <th className="text-right px-3 py-2">Déjà validé</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.dpgf || []).length === 0 ? (
+                <tr>
+                  <td className="px-3 py-3" colSpan={4}>
+                    Aucune ligne DPGF.
+                  </td>
+                </tr>
+              ) : (
+                data.dpgf.map((l: any) => {
+                  const done =
+                    Number(l.validatedHt || 0) >= Number(l.totalHt || 0) &&
+                    Number(l.totalHt || 0) > 0;
+                  return (
+                    <tr key={l.id} className={`border-t ${done ? "text-slate-400" : ""}`}>
+                      <td className="px-3 py-2">{l.code ?? ""}</td>
+                      <td className="px-3 py-2">{l.description ?? ""}</td>
+                      <td className="px-3 py-2 text-right">{eur(l.totalHt)}</td>
+                      <td className="px-3 py-2 text-right">{eur(l.validatedHt)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href={`/devis/${marcheId}/avenant`}
+          className="inline-flex items-center px-3 py-2 rounded bg-blue-600 text-white hover:opacity-90"
+        >
+          Valider un avenant
+        </Link>
+        <Link
+          href={`/devis/${marcheId}/remise`}
+          className="inline-flex items-center px-3 py-2 rounded bg-fuchsia-600 text-white hover:opacity-90"
+        >
+          Valider une remise
+        </Link>
+        <Link
+          href={`/devis/${marcheId}/deduction`}
+          className="inline-flex items-center px-3 py-2 rounded bg-rose-600 text-white hover:opacity-90"
+        >
+          Valider une déduction
+        </Link>
+      </div>
+    </div>
+  );
+}

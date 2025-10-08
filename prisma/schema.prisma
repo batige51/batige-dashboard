@@ -55,17 +55,23 @@ model Entreprise {
 }
 
 model Marche {
-  id               Int      @id @default(autoincrement())
+  id               Int     @id @default(autoincrement())
   projectId        Int
   entrepriseId     Int
   reference        String?
-  montantInitialHt Float    @default(0)
+  montantInitialHt Float   @default(0)
+  remiseHt         Float   @default(0) // remise négative sur le marché
+  rgPct            Float   @default(0) // % Retenue de Garantie
+  prorataPct       Float   @default(0) // % Prorata
+
+  // 👇 NOUVEAU : acompte à déduire automatiquement sur la prochaine PP
+  pendingAcompteHt Float   @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   // Relations
-  project           Project             @relation(fields: [projectId], references: [id])
-  entreprise        Entreprise          @relation(fields: [entrepriseId], references: [id])
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entreprise        Entreprise          @relation(fields: [entrepriseId], references: [id]) // pas de cascade ici
   dpgf              DpgfLine[]
   factures          Facture[]
   AvenantEntreprise AvenantEntreprise[]
@@ -86,7 +92,7 @@ model DpgfLine {
   idx         Int?
 
   // Relations
-  marche       Marche        @relation(fields: [marcheId], references: [id])
+  marche       Marche        @relation(fields: [marcheId], references: [id], onDelete: Cascade)
   factureLines FactureLine[]
   ppLines      PpLine[]
   AvenantLine  AvenantLine[]
@@ -107,9 +113,9 @@ model Facture {
   isDgd      Boolean @default(false) // DGD (levée de RG)
 
   // Relations
-  project     Project              @relation(fields: [projectId], references: [id])
-  entreprise  Entreprise           @relation(fields: [entrepriseId], references: [id])
-  marche      Marche               @relation(fields: [marcheId], references: [id])
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entreprise  Entreprise           @relation(fields: [entrepriseId], references: [id]) // pas de cascade
+  marche      Marche               @relation(fields: [marcheId], references: [id], onDelete: Cascade)
   lignes      FactureLine[]
   pp          PropositionPaiement?
   attachments Attachment[]
@@ -123,8 +129,8 @@ model FactureLine {
   validatedHt Float @default(0)
 
   // Relations
-  facture  Facture  @relation(fields: [factureId], references: [id])
-  dpgfLine DpgfLine @relation(fields: [dpgfLineId], references: [id])
+  facture  Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
 }
 
 //
@@ -139,7 +145,7 @@ model PropositionPaiement {
 
   // Relations
   lines   PpLine[]
-  facture Facture  @relation(fields: [factureId], references: [id])
+  facture Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
 }
 
 model PpLine {
@@ -151,8 +157,8 @@ model PpLine {
   remainingHt Float @default(0)
 
   // Relations
-  pp       PropositionPaiement @relation(fields: [ppId], references: [id])
-  dpgfLine DpgfLine            @relation(fields: [dpgfLineId], references: [id])
+  pp       PropositionPaiement @relation(fields: [ppId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine            @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
 }
 
 //
@@ -166,7 +172,7 @@ model AvenantEntreprise {
   statut   AvenantStatut @default(BROUILLON)
 
   // Relations
-  marche Marche        @relation(fields: [marcheId], references: [id])
+  marche Marche        @relation(fields: [marcheId], references: [id], onDelete: Cascade)
   lines  AvenantLine[]
 }
 
@@ -177,8 +183,8 @@ model AvenantLine {
   deltaHt    Float // + ou - (HT)
 
   // Relations
-  avenant  AvenantEntreprise @relation(fields: [avenantId], references: [id])
-  dpgfLine DpgfLine          @relation(fields: [dpgfLineId], references: [id])
+  avenant  AvenantEntreprise @relation(fields: [avenantId], references: [id], onDelete: Cascade)
+  dpgfLine DpgfLine          @relation(fields: [dpgfLineId], references: [id], onDelete: Cascade)
 }
 
 //
@@ -193,7 +199,7 @@ model Lot {
   prixCatalogueHt Float   @default(0)
 
   // Relations
-  project Project      @relation(fields: [projectId], references: [id])
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   ventes  VenteActee[]
 }
 
@@ -207,7 +213,7 @@ model VenteActee {
   tmaTotalHt  Float    @default(0) // total TMA (HT)
 
   // Relations
-  lot  Lot       @relation(fields: [lotId], references: [id])
+  lot  Lot       @relation(fields: [lotId], references: [id], onDelete: Cascade)
   tmas TmaLine[]
 }
 
@@ -219,7 +225,7 @@ model TmaLine {
   deltaHt     Float // + pour plus-value, - pour moins-value
 
   // Relations
-  vente VenteActee @relation(fields: [venteId], references: [id])
+  vente VenteActee @relation(fields: [venteId], references: [id], onDelete: Cascade)
 }
 
 //
@@ -237,6 +243,6 @@ model Attachment {
   factureId Int?
   marcheId  Int?
 
-  facture Facture? @relation(fields: [factureId], references: [id])
-  marche  Marche?  @relation(fields: [marcheId], references: [id])
+  facture Facture? @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  marche  Marche?  @relation(fields: [marcheId], references: [id], onDelete: Cascade)
 }

@@ -1,6 +1,6 @@
+import prisma from "@/lib/prisma";
+export const runtime = "nodejs";
 import { NextResponse, NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 
 // Export JSON d'une Proposition de Paiement (PP) + lignes et totaux
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
