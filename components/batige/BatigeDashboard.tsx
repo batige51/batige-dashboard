@@ -2,102 +2,109 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  LayoutDashboard, FolderKanban, FileSpreadsheet, CheckSquare, Upload,
-  Settings, Building2, Search, CheckCircle, AlertCircle, PiggyBank, FileText
+  LayoutDashboard,
+  FolderKanban,
+  FileSpreadsheet,
+  CheckSquare,
+  Upload,
+  Settings,
+  Building2,
+  PiggyBank,
+  FileText,
+  Users2,
+  BarChart3,
+  Calculator,
+  Wrench,
+  Briefcase,
 } from "lucide-react";
 
-/**
- * BATIGE — Accueil (Dashboard) UI — NAV SIMPLIFIÉE
- * -> Un seul item: "Validation des factures"
- * -> Les anciens items "Factures" et "Propositions de Paiement" sont retirés
- */
-
+// ---- Types ----
 export type DashboardStats = {
   projectsActive?: number;
   projectsTotal?: number;
   budgetTotalLabel?: string;
-  validatedInvoicesTotalLabel?: string;
-  pendingValidationsCount?: number;
 };
 
 export type DashboardRoutes = {
   dashboard?: string;
   projects?: string;
-  devis?: string;                // ✅ nouveau lien "Devis"
-  validation?: string;           // ✅ unique entrée "Validation des factures"
+  devis?: string;
+  validation?: string;
   budget?: string;
-  factures: string;
+  factures?: string;
   marchesAvenants?: string;
   importsExports?: string;
   settings?: string;
-  newInvoice?: string;           // utilisé par la topbar si besoin
-  importDpgf?: string;           // utilisé par la topbar si besoin
   allProjects?: string;
   allValidations?: string;
 };
 
-export type DashboardActions = {
-  onNewInvoice?: () => void;
-  onImportDpgf?: () => void;
-  onSearch?: (q: string) => void;
+type RecentProject = {
+  id: number;
+  name: string;
+  updatedAt: string | Date;
 };
 
+// ---- Composant principal ----
 export default function BatigeDashboard({
   stats,
   routes,
-  actions,
+  recentProjects,
 }: {
   stats?: DashboardStats;
   routes?: DashboardRoutes;
-  actions?: DashboardActions;
+  recentProjects?: RecentProject[];
 }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="hidden md:flex w-72 flex-col border-r bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        {/* 🧭 Sidebar */}
+        <aside className="hidden md:flex w-72 flex-col border-r bg-white/90 backdrop-blur">
           <div className="px-5 py-4 flex items-center gap-3 border-b">
             <div className="h-9 w-9 rounded-xl bg-blue-600 text-white grid place-items-center shadow-sm">
               <Building2 className="h-5 w-5" />
             </div>
             <div>
               <div className="text-sm font-semibold leading-tight">BATIGE</div>
-              <div className="text-xs text-muted-foreground -mt-0.5">Gestion de chantier</div>
+              <div className="text-xs text-muted-foreground -mt-0.5">Résidences</div>
             </div>
           </div>
+
           <nav className="p-3 text-sm space-y-1">
             <SidebarItem icon={LayoutDashboard} label="Tableau de bord" href={routes?.dashboard ?? "/"} />
             <SidebarItem icon={FolderKanban} label="Projets" href={routes?.projects ?? "/projects"} />
             <SidebarItem icon={FileSpreadsheet} label="Devis" href={routes?.devis ?? "/devis"} />
-
-            {/* ✅ Un seul item pour tout : Validation des factures */}
             <SidebarItem icon={CheckSquare} label="Validation des factures" href={routes?.validation ?? "/validation"} />
-
             <SidebarItem icon={PiggyBank} label="Budget & Suivi" href={routes?.budget ?? "/budget"} />
             <SidebarItem icon={FileText} label="Marchés & Avenants" href={routes?.marchesAvenants ?? "/marches"} />
+
+            {/* 🔒 Bouton Imports / Exports temporairement désactivé */}
+            {/*
             <SidebarItem icon={Upload} label="Imports / Exports" href={routes?.importsExports ?? "/imports"} />
+            */}
+            
+            <Separator className="my-3" />
+
+            {/* 🆕 Sections supplémentaires */}
+            <SidebarItem icon={Users2} label="Clients et grille de vente" href="#" />
+            <SidebarItem icon={BarChart3} label="Analyse" href="#" />
+            <SidebarItem icon={Calculator} label="Comptabilité" href="#" />
+            <SidebarItem icon={Wrench} label="SAV" href="#" />
+            <SidebarItem icon={Briefcase} label="Direction" href="#" />
+
             <Separator className="my-3" />
             <SidebarItem icon={Settings} label="Paramètres" href={routes?.settings ?? "/settings"} />
           </nav>
         </aside>
 
-        {/* Contenu */}
+        {/* 🧩 Contenu principal */}
         <main className="flex-1">
-          <TopBar
-            onSearch={actions?.onSearch}
-            onNewInvoice={actions?.onNewInvoice}
-            onImportDpgf={actions?.onImportDpgf}
-            newInvoiceHref={routes?.newInvoice}
-            importDpgfHref={routes?.importDpgf}
-          />
-
-          {/* Corps */}
+          <TopBar />
           <div className="max-w-7xl mx-auto px-4 py-6">
-            {/* KPIs */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 📊 Statistiques principales */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
               <StatCard
                 title="Projets actifs"
                 value={formatProjects(stats?.projectsActive, stats?.projectsTotal)}
@@ -110,49 +117,35 @@ export default function BatigeDashboard({
                 icon={<PiggyBank className="h-4 w-4" />}
                 tone="green"
               />
-              <StatCard
-                title="Factures validées"
-                value={stats?.validatedInvoicesTotalLabel ?? "—"}
-                icon={<CheckCircle className="h-4 w-4" />}
-                tone="orange"
-              />
-              <StatCard
-                title="En attente"
-                value={typeof stats?.pendingValidationsCount === "number" ? String(stats?.pendingValidationsCount) : "—"}
-                icon={<AlertCircle className="h-4 w-4" />}
-                tone="red"
-              />
             </section>
 
-            {/* Panneaux */}
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-              <Card className="lg:col-span-2 shadow-sm">
+            {/* 🕓 Projets récents */}
+            <section className="grid grid-cols-1 gap-4 mt-6">
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Projets récents</CardTitle>
                   <CardDescription>Derniers projets créés ou modifiés</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <EmptyState
-                    title="Aucun projet récent"
-                    description="Créez votre premier projet pour démarrer le suivi."
-                    actionLabel="Voir les projets"
-                    href={routes?.projects ?? "/projects"}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle>Validations à faire</CardTitle>
-                  <CardDescription>Suivi des factures en attente</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <EmptyState
-                    title="Aucune validation en attente"
-                    description="Quand des factures seront importées, elles apparaîtront ici."
-                    actionLabel="Aller aux validations"
-                    href={routes?.validation ?? "/validation"}
-                  />
+                  {recentProjects && recentProjects.length > 0 ? (
+                    <ul className="divide-y">
+                      {recentProjects.map((p) => (
+                        <li key={p.id} className="py-2 flex justify-between items-center">
+                          <span>{p.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(p.updatedAt).toLocaleDateString("fr-FR")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <EmptyState
+                      title="Aucun projet récent"
+                      description="Créez votre premier projet pour démarrer le suivi."
+                      actionLabel="Voir les projets"
+                      href={routes?.projects ?? "/projects"}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </section>
@@ -163,55 +156,23 @@ export default function BatigeDashboard({
   );
 }
 
-function TopBar({
-  onSearch,
-  onNewInvoice,
-  onImportDpgf,
-  newInvoiceHref,
-  importDpgfHref,
-}: {
-  onSearch?: (q: string) => void;
-  onNewInvoice?: () => void;
-  onImportDpgf?: () => void;
-  newInvoiceHref?: string;
-  importDpgfHref?: string;
-}) {
+// ---- Top Bar ----
+function TopBar() {
   return (
-    <header className="sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b">
+    <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-2">
         <h1 className="text-xl font-semibold">Tableau de bord BATIGE</h1>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un projet, une facture…"
-              className="pl-8 w-72"
-              onChange={(e) => onSearch?.(e.target.value)}
-            />
-          </div>
-          {onNewInvoice ? (
-            <Button onClick={onNewInvoice}>Nouvelle facture</Button>
-          ) : newInvoiceHref ? (
-            <Button asChild><a href={newInvoiceHref}>Nouvelle facture</a></Button>
-          ) : null}
-          {onImportDpgf ? (
-            <Button variant="outline" onClick={onImportDpgf}>Importer DPGF</Button>
-          ) : importDpgfHref ? (
-            <Button variant="outline" asChild><a href={importDpgfHref}>Importer DPGF</a></Button>
-          ) : null}
-        </div>
       </div>
     </header>
   );
 }
 
-function SidebarItem({ icon: Icon, label, href, active }: { icon: any; label: string; href?: string; active?: boolean }) {
+// ---- Sidebar Item ----
+function SidebarItem({ icon: Icon, label, href }: { icon: any; label: string; href?: string }) {
   return (
     <a
       href={href ?? "#"}
-      className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-        active ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
-      }`}
+      className="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors"
     >
       <Icon className="h-4 w-4" />
       <span>{label}</span>
@@ -219,12 +180,25 @@ function SidebarItem({ icon: Icon, label, href, active }: { icon: any; label: st
   );
 }
 
-function StatCard({ title, value, icon, tone }: { title: string; value: string; icon: React.ReactNode; tone?: "blue" | "green" | "orange" | "red" }) {
+// ---- Stat Card ----
+function StatCard({
+  title,
+  value,
+  icon,
+  tone,
+}: {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  tone?: "blue" | "green";
+}) {
   const toneClass =
-    tone === "blue" ? "text-blue-600" :
-    tone === "green" ? "text-emerald-600" :
-    tone === "orange" ? "text-orange-600" :
-    tone === "red" ? "text-red-600" : "";
+    tone === "blue"
+      ? "text-blue-600"
+      : tone === "green"
+      ? "text-emerald-600"
+      : "";
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -240,7 +214,18 @@ function StatCard({ title, value, icon, tone }: { title: string; value: string; 
   );
 }
 
-function EmptyState({ title, description, actionLabel, href }: { title: string; description: string; actionLabel?: string; href?: string }) {
+// ---- Empty State ----
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  href,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  href?: string;
+}) {
   return (
     <div className="rounded-xl border border-dashed p-8 text-center bg-white">
       <div className="text-base font-medium">{title}</div>
@@ -254,6 +239,7 @@ function EmptyState({ title, description, actionLabel, href }: { title: string; 
   );
 }
 
+// ---- Helper ----
 function formatProjects(active?: number, total?: number) {
   if (typeof active !== "number" || typeof total !== "number") return "—";
   return `${active} sur ${total}`;

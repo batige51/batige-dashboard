@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import HomeButton from "@/components/ui/HomeButton";
 
 type Project = { id: number; name: string };
 type DevisItem = {
@@ -11,26 +12,21 @@ type DevisItem = {
   reference?: string | null;
   project: { id: number; name: string };
   entreprise: { id: number; name: string };
-  lots: string[];        // lots “tels quels” en base
-  montantHt: number;     // total des lignes DPGF initiales (sans avenants/remises/déductions)
-  avenantsHt: number;    // somme des avenants/remises/déductions (peut être négatif)
+  lots: string[];
+  montantHt: number;
+  avenantsHt: number;
 };
 
 const eur = (n: number) =>
   (n ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
-// Ce sont des “lots” techniques qui ne doivent pas apparaître comme vrais lots
 const EXCLUDED_LOTS = new Set(["avenants", "remise", "acompte", "annexe", "annexes"]);
 
 export default function DevisPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [devis, setDevis] = useState<DevisItem[]>([]);
   const [search, setSearch] = useState("");
-
-  // Filtres (en haut)
   const [projectFilter, setProjectFilter] = useState<string>("");
-
-  // Formulaire d’import CSV (inchangé)
   const [importProjectId, setImportProjectId] = useState<string>("");
   const [entrepriseName, setEntrepriseName] = useState<string>("");
   const [lot, setLot] = useState("Gros oeuvre");
@@ -38,7 +34,7 @@ export default function DevisPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Charge les projets (pour liste & import)
+  // Charge les projets
   useEffect(() => {
     fetch("/api/projects")
       .then((r) => r.json())
@@ -72,7 +68,6 @@ export default function DevisPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    // Ajoute un champ “lotsPropres” (lots réels sans Avenants/Remise/…)
     const items = devis.map((d) => {
       const lotsPropres = (d.lots || []).filter(
         (l) => !EXCLUDED_LOTS.has((l || "").toLowerCase())
@@ -121,6 +116,9 @@ export default function DevisPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        <HomeButton />
+
+        {/* Titre + recherche */}
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-extrabold tracking-tight">Devis (DPGF)</h1>
           <div className="ml-auto">
@@ -168,6 +166,7 @@ export default function DevisPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Importer un CSV DPGF</CardTitle>
+            <CardDescription>Sélectionnez un projet et chargez un fichier CSV.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
             <select
@@ -190,7 +189,7 @@ export default function DevisPage() {
             />
 
             <Input
-              placeholder="Lot (ex : Gros oeuvre)"
+              placeholder="Lot (ex : Gros œuvre)"
               value={lot}
               onChange={(e) => setLot(e.target.value)}
               className="w-[220px]"
@@ -213,7 +212,7 @@ export default function DevisPage() {
         {/* Liste */}
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Liste</CardTitle>
+            <CardTitle>Liste des devis</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -233,7 +232,7 @@ export default function DevisPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-3" colSpan={8}>
+                      <td className="px-3 py-3 text-center" colSpan={8}>
                         Aucun devis.
                       </td>
                     </tr>
@@ -252,7 +251,9 @@ export default function DevisPage() {
                           </td>
                           <td className="px-3 py-2 text-right">{eur(d.montantHt)}</td>
                           <td className="px-3 py-2 text-right">{eur(d.avenantsHt)}</td>
-                          <td className="px-3 py-2 text-right font-semibold">{eur(total)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {eur(total)}
+                          </td>
                           <td className="px-3 py-2">
                             <a
                               href={`/devis/${d.id}`}

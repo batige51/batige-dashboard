@@ -1,5 +1,8 @@
 "use client";
+
 import { use, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import HomeButton from "@/components/ui/HomeButton";
 
 type ParsedRow = {
   code: string;
@@ -18,7 +21,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
   async function load() {
     setLoading(true);
-    // on va chercher les lignes DPGF existantes
     const res = await fetch(`/api/marches/${id}/dpgf`, { cache: "no-store" });
     const data = await res.json();
     setDpgf(Array.isArray(data) ? data : []);
@@ -26,50 +28,55 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   }
 
   useEffect(() => {
-    // si tu as une API pour lire le marché, tu peux l’appeler ici ; sinon on affiche juste l’ID
     setMarche({ id });
     load();
   }, [id]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Marché #{id}</h1>
-      </div>
+    <div className="min-h-screen bg-slate-50 px-4 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <HomeButton />
 
-      {/* Bloc Import CSV */}
-      <ImportCsv marcheId={id} onImported={load} />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Marché #{id}</h1>
+        </div>
 
-      {/* DPGF actuelle */}
-      <div className="rounded border bg-white overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left">
-            <tr>
-              <th className="px-3 py-2">Code</th>
-              <th className="px-3 py-2">Désignation</th>
-              <th className="px-3 py-2">Unité</th>
-              <th className="px-3 py-2 text-right">Qté</th>
-              <th className="px-3 py-2 text-right">PU HT</th>
-              <th className="px-3 py-2 text-right">Total HT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="px-3 py-2" colSpan={6}>Chargement…</td></tr>
-            ) : dpgf.length === 0 ? (
-              <tr><td className="px-3 py-2 text-slate-600" colSpan={6}>Aucune ligne DPGF dans ce marché.</td></tr>
-            ) : dpgf.map((r: any) => (
-              <tr key={r.id} className="border-t">
-                <td className="px-3 py-2">{r.code || "-"}</td>
-                <td className="px-3 py-2">{r.description || "-"}</td>
-                <td className="px-3 py-2">{r.unite || "-"}</td>
-                <td className="px-3 py-2 text-right">{r.qty?.toLocaleString("fr-FR")}</td>
-                <td className="px-3 py-2 text-right">{r.unitPriceHt?.toLocaleString("fr-FR")} €</td>
-                <td className="px-3 py-2 text-right">{r.totalHt?.toLocaleString("fr-FR")} €</td>
+        {/* Bloc Import CSV */}
+        <ImportCsv marcheId={id} onImported={load} />
+
+        {/* DPGF actuelle */}
+        <div className="rounded border bg-white overflow-hidden">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                <th className="px-3 py-2">Code</th>
+                <th className="px-3 py-2">Désignation</th>
+                <th className="px-3 py-2">Unité</th>
+                <th className="px-3 py-2 text-right">Qté</th>
+                <th className="px-3 py-2 text-right">PU HT</th>
+                <th className="px-3 py-2 text-right">Total HT</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td className="px-3 py-2" colSpan={6}>Chargement…</td></tr>
+              ) : dpgf.length === 0 ? (
+                <tr><td className="px-3 py-2 text-slate-600" colSpan={6}>Aucune ligne DPGF dans ce marché.</td></tr>
+              ) : (
+                dpgf.map((r: any) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="px-3 py-2">{r.code || "-"}</td>
+                    <td className="px-3 py-2">{r.description || "-"}</td>
+                    <td className="px-3 py-2">{r.unite || "-"}</td>
+                    <td className="px-3 py-2 text-right">{r.qty?.toLocaleString("fr-FR")}</td>
+                    <td className="px-3 py-2 text-right">{r.unitPriceHt?.toLocaleString("fr-FR")} €</td>
+                    <td className="px-3 py-2 text-right">{r.totalHt?.toLocaleString("fr-FR")} €</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -83,14 +90,15 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
   const [busy, setBusy] = useState(false);
 
   function detectDelimiter(sample: string): "," | ";" {
-    // simple heuristique
     const commas = (sample.match(/,/g) || []).length;
     const semis = (sample.match(/;/g) || []).length;
     return semis > commas ? ";" : ",";
   }
 
   function normalizeHeader(h: string) {
-    return h.trim().toLowerCase()
+    return h
+      .trim()
+      .toLowerCase()
       .replace(/\s+/g, "_")
       .replace(/[éèê]/g, "e")
       .replace(/[àâ]/g, "a")
@@ -106,7 +114,6 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
 
     const text = await ff.text();
 
-    // détecter délimiteur
     const delim = detectDelimiter(text.slice(0, 2000));
     const lines = text.split(/\r?\n/).filter(Boolean);
     if (lines.length === 0) {
@@ -114,21 +121,21 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
       return;
     }
 
-    // headers
     const headers = lines[0].split(delim).map(normalizeHeader);
     const required = ["code", "designation", "unite", "quantite", "pu_ht"];
     for (const req of required) {
       if (!headers.includes(req)) {
-        setErr(`Colonne obligatoire manquante : "${req}". En-têtes lus : ${headers.join(", ")}`);
+        setErr(`Colonne obligatoire manquante : "${req}".`);
         return;
       }
     }
-    const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
 
+    const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
     const parsed: ParsedRow[] = [];
+
     for (let i = 1; i < lines.length; i++) {
       const cells = lines[i].split(delim);
-      if (cells.every(c => c.trim() === "")) continue;
+      if (cells.every((c) => c.trim() === "")) continue;
 
       const code = (cells[idx.code] || "").trim();
       const designation = (cells[idx.designation] || "").trim();
@@ -150,10 +157,10 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
 
   async function onImport() {
     if (rows.length === 0) return;
-    setBusy(true); setErr(null);
+    setBusy(true);
+    setErr(null);
     try {
-      // transforme en JSON compatible avec l’API d’import (adapte si besoin)
-      const payload = rows.map(r => ({
+      const payload = rows.map((r) => ({
         code: r.code,
         description: r.designation,
         unite: r.unite,
@@ -169,11 +176,10 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d?.error || `Erreur ${res.status}`);
-      // succès
       setFile(null);
       setRows([]);
       onImported();
-      alert(`Import réussi : ${Array.isArray(d) ? d.length : "OK"} lignes`);
+      alert(`Import réussi (${Array.isArray(d) ? d.length : "OK"} lignes)`);
     } catch (e: any) {
       setErr(e.message || "Erreur inconnue");
     } finally {
@@ -190,30 +196,19 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
     <div className="rounded border bg-white p-4 space-y-3">
       <div className="text-sm font-semibold">Importer DPGF (CSV)</div>
       <div className="text-xs text-slate-600">
-        Colonnes **obligatoires** (exactes) : <code>code</code>, <code>designation</code>, <code>unite</code>, <code>quantite</code>, <code>pu_ht</code>.  
-        Séparateur détecté automatiquement (`,` ou `;`). Décimales acceptées avec `,` ou `.`.
+        Colonnes obligatoires : <code>code</code>, <code>designation</code>, <code>unite</code>, <code>quantite</code>, <code>pu_ht</code>.
       </div>
 
       {err && <div className="rounded bg-red-50 text-red-700 p-3">{err}</div>}
 
       <div className="flex items-center gap-3">
-        <input id="csvfile" type="file" accept=".csv" onChange={(e)=>onPickFile(e.target.files?.[0] || undefined)} />
-        <button
-          onClick={() => onPickFile()}
-          className="rounded border px-3 py-1 text-sm"
-        >
-          Prévisualiser
-        </button>
-        <button
-          onClick={onImport}
-          disabled={rows.length === 0 || busy}
-          className="rounded bg-blue-600 px-4 py-1.5 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        <input id="csvfile" type="file" accept=".csv" onChange={(e) => onPickFile(e.target.files?.[0])} />
+        <Button variant="outline" onClick={() => onPickFile()}>Prévisualiser</Button>
+        <Button onClick={onImport} disabled={rows.length === 0 || busy}>
           {busy ? "Import…" : "Importer"}
-        </button>
+        </Button>
       </div>
 
-      {/* Aperçu */}
       {rows.length > 0 && (
         <div className="rounded border bg-white overflow-auto">
           <table className="min-w-full text-sm">
@@ -241,8 +236,10 @@ function ImportCsv({ marcheId, onImported }: { marcheId: string; onImported: () 
             </tbody>
             <tfoot className="bg-slate-50">
               <tr>
-                <td className="px-3 py-2 font-medium" colSpan={5}>Total aperçu</td>
-                <td className="px-3 py-2 text-right font-semibold">{totalPreview.toLocaleString("fr-FR")} €</td>
+                <td colSpan={5} className="px-3 py-2 font-medium">Total aperçu</td>
+                <td className="px-3 py-2 text-right font-semibold">
+                  {totalPreview.toLocaleString("fr-FR")} €
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -258,6 +255,7 @@ function parseNumber(v: any) {
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
 }
+
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }

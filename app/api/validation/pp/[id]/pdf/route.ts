@@ -8,7 +8,6 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 
-
 const A4: [number, number] = [595.28, 841.89];
 const [PAGE_W, PAGE_H] = A4;
 const M = 50;
@@ -50,7 +49,6 @@ function wrapText(text: string, size: number, maxWidth: number, font: any): stri
   return lines;
 }
 
-// ⚠️ ICI: params est une Promise -> on l'attend
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
@@ -67,9 +65,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     if (!pp) return NextResponse.json({ error: "PP introuvable" }, { status: 404 });
 
     const marche = pp.facture.marche as any;
-    const projectName = marche.project?.name ?? marche.project?.nom ?? "";
-    const entrepriseName = marche.entreprise?.name ?? marche.entreprise?.nom ?? "";
-    const marcheRef = marche.reference ?? marche.nom ?? `#${marche.id}`;
+    const projectName = marche.project?.name ?? "";
+    const entrepriseName = marche.entreprise?.name ?? "";
+    const marcheRef = marche.reference ?? `#${marche.id}`;
     const refPP = pp.numero ?? `PP-${pp.id}`;
 
     const montantMarche = (marche.dpgf ?? []).reduce((s: number, l: any) => s + Number(l.totalHt ?? 0), 0);
@@ -133,13 +131,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       const footer = `Page ${pageNo}`;
       page.drawText(footer, { x: PAGE_W - M - fontReg.widthOfTextAtSize(footer,9), y: M-18, size: 9, font: fontReg, color: rgb(0.5,0.5,0.5) });
     };
-    const newPage = (subtitle?: string) => {
-      addFooter();
-      page = pdf.addPage(A4); pageNo++; y = PAGE_H - M;
-      if (subtitle) { page.drawText(subtitle, { x: M, y, size: 12, font: fontReg }); y -= LINE; }
-      page.drawLine({ start: { x: M, y }, end: { x: PAGE_W - M, y }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
-      y -= 8;
-    };
 
     try {
       const logo = loadLogo();
@@ -152,9 +143,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       }
     } catch {}
 
-    y -= 6; page.drawText("CERTIFICAT DE PAIEMENT", { x: M, y, size: 18, font: fontReg }); y -= 30;
+    y -= 6;
+    page.drawText("CERTIFICAT DE PAIEMENT", { x: M, y, size: 18, font: fontReg });
+    y -= 30;
 
-    draw(`Maître d'ouvrage / Projet : ${projectName}`);
+    // === MODIF 1 : nom du maître d’ouvrage surligné + gras ===
+    const highlightWidth = fontBold.widthOfTextAtSize(projectName, 10) + 6;
+    page.drawRectangle({
+      x: M + 180 - 2,
+      y: y - 2,
+      width: highlightWidth,
+      height: 14,
+      color: rgb(1, 1, 0.6),
+    });
+    page.drawText(`Maître d'ouvrage / Projet : `, { x: M, y, size: 10, font: fontReg });
+    page.drawText(projectName, { x: M + 180, y, size: 10, font: fontBold });
+    y -= LINE;
+
     draw(`Entreprise : ${entrepriseName}`);
     draw(`Devis : ${marcheRef}`);
     draw(`Numéro de PP : ${refPP}`);
@@ -177,7 +182,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const boxW = PAGE_W - 2 * M;
     page.drawRectangle({
       x: M, y: boxTop - boxH, width: boxW, height: boxH,
-      color: rgb(0.965,0.965,0.965), borderColor: rgb(0.7,0.7,0.7), borderWidth: 0.5
+      color: rgb(0.965,0.965,0.965), borderColor: rgb(0.7,0.7,0.7), borderWidth: 0.5,
     });
     y = boxTop - 12;
     page.drawText("MONTANT DU CERTIFICAT DE PAIEMENT (NET À PAYER)", { x: M + 8, y, size: 12, font: fontReg });
@@ -199,58 +204,21 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
     y -= LINE + 10;
     draw(`Taux d'avancement cumulé / marché en % : ${tauxAvancement.toFixed(2)}`);
+
+    // === MODIF 2 : signatures ===
+    const signY = 100;
+    const leftX = M;
+    const rightX = PAGE_W - M - 220;
+    page.drawText("Signature du service travaux :", { x: leftX, y: signY + 60, size: 11, font: fontReg });
+    page.drawLine({ start: { x: leftX, y: signY + 55 }, end: { x: leftX + 200, y: signY + 55 }, thickness: 0.6, color: rgb(0, 0, 0) });
+    page.drawText("Date : ____ / ____ / ______", { x: leftX, y: signY + 35, size: 10, font: fontReg });
+
+    page.drawText("Signature de la direction :", { x: rightX, y: signY + 60, size: 11, font: fontReg });
+    page.drawLine({ start: { x: rightX, y: signY + 55 }, end: { x: rightX + 200, y: signY + 55 }, thickness: 0.6, color: rgb(0, 0, 0) });
+
     addFooter();
 
-    const lines = (pp.lines || []).map((l: any) => ({
-      code: l.dpgfLine?.code ?? "",
-      desc: l.dpgfLine?.description ?? l.dpgfLine?.libelle ?? "",
-      amt: Number(l.currentHt ?? 0),
-    }));
-
-    if (lines.length > 0) {
-      const headerAnnexe = "Annexe — Détail (PP en cours)";
-      const headerAnnexeSuite = "Annexe — Détail (PP en cours) (suite)";
-
-      const startNew = (title: string) => {
-        addFooter();
-        page = pdf.addPage(A4); y = PAGE_H - M; pageNo++;
-        page.drawText(title, { x: M, y, size: 12, font: fontReg }); y -= LINE;
-        page.drawLine({ start: { x: M, y }, end: { x: PAGE_W - M, y }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
-        y -= 8;
-      };
-
-      const colCode = M;
-      const colDesc = M + 70;
-      const colAmt  = RIGHT_COL;
-      const descWidth = colAmt - 12 - colDesc;
-
-      startNew(headerAnnexe);
-
-      for (const r of lines) {
-        if (y < 90) startNew(headerAnnexeSuite);
-
-        const descLines = wrapText(`${r.code ? r.code + " — " : ""}${r.desc}`, 10, descWidth, fontReg);
-        page.drawText(r.code || "", { x: colCode, y, size: 10, font: fontReg });
-        page.drawText(descLines[0] || "", { x: colDesc, y, size: 10, font: fontReg });
-
-        const amtStr = eur(r.amt);
-        const aw = fontReg.widthOfTextAtSize(amtStr, 10);
-        page.drawText(amtStr, { x: colAmt - aw, y, size: 10, font: fontReg });
-
-        y -= LINE;
-        for (let i = 1; i < descLines.length; i++) {
-          if (y < 90) startNew(headerAnnexeSuite);
-          page.drawText(descLines[i], { x: colDesc, y, size: 10, font: fontReg });
-          y -= LINE;
-        }
-
-        page.drawLine({ start: { x: M, y: y + 4 }, end: { x: PAGE_W - M, y: y + 4 }, thickness: 0.25, color: rgb(0.9,0.9,0.9) });
-        y -= 6;
-      }
-
-      addFooter();
-    }
-
+    // === FIN génération ===
     const bytes = await pdf.save();
     return new NextResponse(Buffer.from(bytes), {
       headers: {

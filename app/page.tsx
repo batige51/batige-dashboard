@@ -1,25 +1,48 @@
-import BatigeDashboard, { DashboardRoutes, DashboardStats } from "@/components/batige/BatigeDashboard";
+import prisma from "@/lib/prisma";
+import BatigeDashboard, {
+  DashboardRoutes,
+  DashboardStats,
+} from "@/components/batige/BatigeDashboard";
 
 export default async function Page() {
+  // 🧭 Routes
   const routes: DashboardRoutes = {
     dashboard: "/",
     projects: "/projects",
-    devis: "/devis",           // <- Devis
-    factures: "/factures",     // <- Factures
+    devis: "/devis",
     validation: "/validation",
-    pp: "/pp",
     budget: "/budget",
+    factures: "/factures",
     marchesAvenants: "/marches",
-    importsExports: "/imports",
     settings: "/settings",
-    newInvoice: "/factures/nouvelle",
-    importDpgf: "/devis",
     allProjects: "/projects",
     allValidations: "/validation",
   };
 
-  const stats: DashboardStats = {}; // on ne met pas de données de test
+  // 📊 Données principales
+  const [projectsCount, totalProjects, recentProjects] = await Promise.all([
+    prisma.project.count(),
+    prisma.project.count(),
+    prisma.project.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 3,
+      select: { id: true, name: true, updatedAt: true },
+    }),
+  ]);
 
-  return <BatigeDashboard routes={routes} stats={stats} />;
+  // 💰 Statistiques affichées
+  const stats: DashboardStats = {
+    projectsActive: projectsCount,
+    projectsTotal: totalProjects,
+    budgetTotalLabel: "—",
+  };
+
+  // 🚀 Rendu principal
+  return (
+    <BatigeDashboard
+      routes={routes}
+      stats={stats}
+      recentProjects={recentProjects}
+    />
+  );
 }
-

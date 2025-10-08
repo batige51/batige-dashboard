@@ -1,8 +1,12 @@
+import { Button } from "@/components/ui/button";
 "use client";
 
 import { useState } from "react";
 
 export default function ImportsPage() {
+  );
+  
+  
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -56,8 +60,6 @@ export default function ImportsPage() {
         >
           {busy ? "Import en cours…" : "Importer"}
         </button>
-        {msg && <div className="text-sm text-red-600">{msg}</div>}
       </form>
-    </div>
   );
 }

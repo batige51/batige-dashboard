@@ -1,7 +1,11 @@
+import { Button } from "@/components/ui/button";
 "use client";
 import { use, useEffect, useMemo, useState } from "react";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  );
+  
+  
   const { id } = use(params); // lot id
   const [lot, setLot] = useState<any>(null);
 
@@ -26,15 +30,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     });
   }, [lot]);
 
-  if (!lot) return <div className="p-6">Chargement…</div>;
 
   return (
     <div className="p-6 space-y-6">
-      <div className="text-2xl font-bold">Ventes — Lot {lot.numero}</div>
 
       {/* Ajout vente */}
       <div className="rounded border p-4 bg-white space-y-2">
-        <div className="font-medium">Ajouter une vente</div>
         <div className="grid md:grid-cols-3 gap-2">
           <input className="rounded border px-2 py-1" placeholder="Client"
                  value={formVente.client} onChange={e=>setFormVente({...formVente,client:e.target.value})}/>
@@ -42,7 +43,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                  value={formVente.prixVenteHt} onChange={e=>setFormVente({...formVente,prixVenteHt:e.target.value})}/>
           <input className="rounded border px-2 py-1" type="number" placeholder="TVA %"
                  value={formVente.tvaRate} onChange={e=>setFormVente({...formVente,tvaRate:e.target.value})}/>
-        </div>
         <button className="rounded bg-blue-600 text-white px-3 py-1.5"
                 onClick={async ()=>{
                   await fetch(`/api/ventes/${id}`,{
@@ -52,7 +52,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                   setFormVente({ client:"", prixVenteHt:"", tvaRate:"20" });
                   reload();
                 }}>Ajouter</button>
-      </div>
 
       {/* Liste ventes + TMA */}
       <div className="rounded border overflow-hidden bg-white">
@@ -84,9 +83,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </tbody>
         </table>
-      </div>
 
-    </div>
   );
 }
 
@@ -106,6 +103,5 @@ function TmaForm({ venteId, onOk }:{ venteId:number; onOk:()=>void }) {
                 });
                 setCode(""); setDesc(""); setDelta(""); onOk();
               }}>+ TMA</button>
-    </div>
   );
 }

@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button"; // ✅ AJOUT ICI
+import HomeButton from "@/components/ui/HomeButton";
 
 export default function NewProjectPage() {
   const [name, setName] = useState("");

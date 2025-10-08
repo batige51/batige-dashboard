@@ -2,8 +2,10 @@
 import AvenantsPanel from "./AvenantsPanel";
 import { PrismaClient } from "@prisma/client";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { DeleteLineButton, DeleteDevisButton } from "@/components/devis/ClientButtons";
+import { Button } from "@/components/ui/button"; // ✅ AJOUT ICI
+import HomeButton from "@/components/ui/HomeButton";
+
 
 export const dynamic = "force-dynamic";
 

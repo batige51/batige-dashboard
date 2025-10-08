@@ -1,7 +1,11 @@
+import { Button } from "@/components/ui/button";
 "use client";
 import { use, useEffect, useState } from "react";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  );
+  
+  
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<string|null>(null);
@@ -15,14 +19,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     })();
   }, [id]);
 
-  if (err) return <div className="p-6 text-red-600">{err}</div>;
-  if (!data) return <div className="p-6">Chargement…</div>;
 
   const f = (n:number)=> (n||0).toLocaleString('fr-FR')+' €';
 
   return (
     <div className="p-6 space-y-6">
-      <div className="text-2xl font-bold">Budget — {data.project.name}</div>
 
       <div className="grid md:grid-cols-5 gap-3">
         <Card title="Initial" value={f(data.totaux.initial)} />
@@ -30,7 +31,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         <Card title="Budget courant" value={f(data.totaux.courant)} />
         <Card title="Validé (cumul)" value={f(data.totaux.valide)} />
         <Card title="Restant" value={f(data.totaux.restant)} />
-      </div>
 
       <div className="rounded border overflow-hidden bg-white">
         <table className="w-full text-sm border-collapse">
@@ -57,16 +57,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
   );
 }
 
 function Card({title, value}:{title:string; value:string}) {
   return (
     <div className="rounded border p-4 bg-white">
-      <div className="text-xs text-slate-600">{title}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
   );
 }

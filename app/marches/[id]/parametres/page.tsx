@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
